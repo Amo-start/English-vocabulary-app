@@ -1,0 +1,45 @@
+{
+  "name": "speedword-classroom",
+  "version": "1.0.0",
+  "description": "极速识词（课堂互动版）— 数字单词卡互动引擎 Windows 桌面版",
+  "author": "SpeedWord",
+  "main": "main.js",
+  "scripts": {
+    "sync:html": "node sync-html.js",
+    "start": "npm run sync:html && electron .",
+    "dist": "npm run sync:html && electron-builder",
+    "dist:win": "npm run sync:html && electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.speedword.classroom",
+    "productName": "极速识词",
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js",
+      "sync-html.js",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "极速识词"
+    }
+  }
+}

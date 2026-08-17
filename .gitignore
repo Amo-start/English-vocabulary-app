@@ -1,0 +1,21 @@
+# Node / Electron
+SpeedWord/node_modules/
+SpeedWord/dist/
+SpeedWord/index.html
+SpeedWord/package-lock.json
+
+# 开发辅助（非交付物）
+_dev/node_modules/
+_dev/package-lock.json
+
+# 临时文件
+*.log
+_app_extract.js
+doc_v1.txt
+
+# 参考文档（规格说明 .docx 不纳入版本控制，太大且格式不友好）
+reference/
+
+# 操作系统
+Thumbs.db
+.DS_Store

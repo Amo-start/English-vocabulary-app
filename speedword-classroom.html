@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>极速识词（课堂互动版）</title>
+<style>
+/* ============ 全局变量与重置 ============ */
+:root{
+  --bg:#0e1114;
+  --bg-2:#14191f;
+  --card:#1b2229;
+  --card-2:#222b34;
+  --line:#2c3640;
+  --text:#f2f5f7;
+  --text-dim:#93a1ad;
+  --green:#3ddc84;
+  --red:#ff5d5d;
+  --amber:#ffb84d;
+  --blue:#4db2ff;
+  --radius:16px;
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC","Helvetica Neue",Arial,sans-serif;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+#app{height:100%;}
+button{font-family:inherit;}
+
+/* ============ 基础控件 ============ */
+.btn{
+  border:none;border-radius:14px;cursor:pointer;
+  min-height:60px;padding:0 28px;
+  font-size:22px;font-weight:600;color:var(--text);
+  background:var(--card-2);border:1px solid var(--line);
+  transition:transform .08s ease, filter .15s ease, background .15s ease;
+  user-select:none;-webkit-user-select:none;
+}
+.btn:hover{filter:brightness(1.12);}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.btn-primary{background:var(--blue);color:#06121f;min-height:84px;font-size:28px;border:none;}
+.btn-success{background:var(--green);color:#04230f;border:none;}
+.btn-danger{background:var(--red);color:#2a0303;border:none;}
+.btn-ghost{background:transparent;}
+.btn-sm{min-height:48px;font-size:18px;padding:0 18px;border-radius:10px;}
+.btn-block{width:100%;}
+
+/* 分段选择器 */
+.seg{display:flex;gap:10px;flex-wrap:wrap;}
+.seg-btn{
+  flex:1;min-width:120px;min-height:60px;padding:0 18px;
+  border-radius:12px;border:1px solid var(--line);
+  background:var(--card);color:var(--text-dim);font-size:20px;font-weight:600;cursor:pointer;
+}
+.seg-btn.active{background:var(--blue);color:#06121f;border-color:var(--blue);}
+.seg-btn:hover{filter:brightness(1.1);}
+
+/* ============ 视图切换 ============ */
+.view{display:none;height:100%;}
+.view.active{display:flex;flex-direction:column;}
+
+.topbar{
+  display:flex;align-items:center;gap:16px;
+  padding:18px 28px;border-bottom:1px solid var(--line);flex-shrink:0;
+}
+.topbar h1{font-size:28px;flex:1;}
+.topbar .btn{min-height:56px;font-size:20px;}
+
+.dim{color:var(--text-dim);}
+.hidden{display:none !important;}
+
+/* ============ 首页 ============ */
+#view-home{justify-content:center;align-items:center;}
+.home-wrap{display:flex;flex-direction:column;align-items:center;gap:34px;padding:30px;max-width:100%;}
+.brand-title{
+  font-size:clamp(56px,8vw,110px);font-weight:800;letter-spacing:4px;
+  background:linear-gradient(120deg,#4db2ff,#3ddc84);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-align:center;line-height:1.05;
+}
+.brand-sub{font-size:clamp(20px,2.6vw,34px);color:var(--text-dim);text-align:center;letter-spacing:10px;}
+.btn-hero{
+  min-height:110px;min-width:min(78vw,520px);font-size:clamp(30px,4vw,46px);
+  background:linear-gradient(135deg,#4db2ff,#2f8ef0);
+  color:#04121f;border:none;border-radius:22px;box-shadow:0 12px 44px rgba(77,178,255,.35);
+  letter-spacing:6px;
+}
+.home-grid{
+  display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:16px;width:min(1200px,94vw);
+}
+.tile{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:22px 10px;cursor:pointer;color:var(--text);font-size:18px;
+  transition:transform .1s ease, background .15s ease;
+}
+.tile:hover{background:var(--card-2);transform:translateY(-3px);}
+.tile-icon{font-size:40px;line-height:1;}
+.tile-stat{color:var(--text-dim);font-size:15px;}
+
+/* ============ 课堂设置 ============ */
+.setup-body{display:flex;flex-direction:column;gap:28px;padding:34px;max-width:860px;width:100%;margin:0 auto;}
+.field{display:flex;flex-direction:column;gap:10px;}
+.field>label{font-size:20px;color:var(--text-dim);font-weight:600;}
+.field select{
+  min-height:64px;border-radius:12px;border:1px solid var(--line);
+  background:var(--card);color:var(--text);font-size:24px;padding:0 16px;
+}
+.field input[type=text],.field input[type=password],.field textarea,.field input[type=url]{
+  min-height:60px;border-radius:12px;border:1px solid var(--line);
+  background:var(--card);color:var(--text);font-size:22px;padding:10px 16px;width:100%;
+}
+.field textarea{min-height:110px;resize:vertical;font-family:inherit;line-height:1.5;}
+
+/* ============ 课堂 ============ */
+#view-classroom{background:var(--bg);}
+.classroom{display:flex;flex-direction:column;height:100%;}
+.classroom-top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 24px;flex-shrink:0;border-bottom:1px solid var(--line);
+}
+.classroom-meta{display:flex;align-items:center;gap:14px;font-size:22px;font-weight:700;}
+.classroom-mode{
+  background:var(--blue);color:#06121f;border-radius:999px;padding:4px 18px;font-size:18px;font-weight:800;
+}
+.classroom-meta .dim{font-weight:500;}
+
+.stage{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:40px;
+  padding:24px;position:relative;min-height:0;
+}
+
+/* 3D 翻牌 */
+.flip-card{position:relative;perspective:1400px;width:min(88vw,940px);height:clamp(320px,54vh,600px);cursor:pointer;}
+.flip-card-inner{
+  position:relative;width:100%;height:100%;
+  transition:transform .6s ease;transform-style:preserve-3d;
+}
+.flip-card.is-flipped .flip-card-inner{transform:rotateY(180deg);}
+.flip-card-front,.flip-card-back{
+  position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:30px;text-align:center;
+  background:linear-gradient(160deg,var(--card-2),var(--card));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+}
+.flip-card-back{transform:rotateY(180deg);background:linear-gradient(160deg,#14241b,#0f1a14);border-color:#24463a;}
+.card-word{
+  font-size:clamp(54px,9vw,140px);font-weight:800;line-height:1.1;letter-spacing:2px;
+  word-break:break-word;
+}
+.card-phonetic{font-size:clamp(30px,4.5vw,64px);color:var(--text-dim);}
+.card-meaning{font-size:clamp(42px,6vw,84px);font-weight:700;line-height:1.25;}
+.card-example{font-size:clamp(22px,3vw,40px);color:var(--text-dim);line-height:1.5;max-width:90%;}
+.card-hint{font-size:clamp(16px,2vw,26px);color:#5b6b78;margin-top:10px;}
+.card-status{
+  position:absolute;top:16px;right:20px;font-size:20px;font-weight:700;
+  padding:4px 14px;border-radius:999px;
+}
+.card-status.mastered{background:var(--green);color:#04230f;}
+.card-status.weak{background:var(--red);color:#2a0303;}
+
+/* 抢答：转盘与结果 */
+.quiz-wheel{
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(40px,6vw,84px);font-weight:800;
+  width:clamp(260px,40vw,420px);height:clamp(260px,40vw,420px);
+  border-radius:50%;
+  background:radial-gradient(circle at 30% 25%,#2a3c4e,#16202b);
+  border:6px solid var(--blue);box-shadow:0 0 80px rgba(77,178,255,.35);
+}
+.quiz-wheel.rolling{animation:wheelspin 1.2s cubic-bezier(.15,.8,.3,1);}
+@keyframes wheelspin{from{transform:rotate(0) scale(1);}to{transform:rotate(720deg) scale(.94);}}
+.quiz-pick{
+  position:absolute;top:6px;left:50%;transform:translateX(-50%);
+  background:var(--amber);color:#2a1a00;border-radius:999px;
+  padding:8px 30px;font-size:clamp(24px,3.2vw,42px);font-weight:800;
+  display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);z-index:5;white-space:nowrap;
+}
+.quiz-pick .sub{font-size:.55em;font-weight:600;color:inherit;}
+
+.classroom-controls{
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  padding:20px 24px 28px;flex-shrink:0;flex-wrap:wrap;
+}
+.classroom-controls .btn{min-height:64px;font-size:22px;}
+.classroom-controls .btn-primary{min-height:72px;}
+
+/* ============ 列表页通用 ============ */
+.page-scroll{flex:1;overflow-y:auto;padding:26px;min-height:0;}
+.list{flex:1;overflow-y:auto;padding:26px;min-height:0;display:flex;flex-direction:column;gap:14px;max-width:1100px;width:100%;margin:0 auto;}
+.list-row{
+  display:flex;align-items:center;gap:16px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 20px;
+}
+.list-row:hover{background:var(--card-2);}
+.row-main{flex:1;min-width:0;}
+.row-title{font-size:24px;font-weight:700;}
+.row-sub{color:var(--text-dim);font-size:17px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.row-count{color:var(--text-dim);font-size:18px;flex-shrink:0;}
+.list-row .btn{min-height:52px;font-size:17px;padding:0 16px;flex-shrink:0;}
+
+.badge{display:inline-block;border-radius:999px;padding:2px 12px;font-size:15px;font-weight:700;}
+.badge.green{background:rgba(61,220,132,.18);color:var(--green);}
+.badge.red{background:rgba(255,93,93,.18);color:var(--red);}
+.badge.dim{background:rgba(255,184,77,.15);color:var(--amber);}
+
+.weak-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-dim);font-size:30px;}
+.empty-emoji{font-size:90px;}
+
+/* ============ 备份/设置 ============ */
+.backup-body{flex:1;overflow-y:auto;padding:30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;align-content:start;max-width:1200px;width:100%;margin:0 auto;}
+.backup-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;display:flex;flex-direction:column;gap:14px;}
+.backup-card h2{font-size:24px;}
+.backup-card p{color:var(--text-dim);font-size:17px;line-height:1.6;}
+.backup-card.danger{border-color:rgba(255,93,93,.4);}
+.settings-body{flex:1;overflow-y:auto;padding:30px;max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:6px;}
+.setting-row{
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:20px 6px;border-bottom:1px solid var(--line);
+}
+.setting-name{font-size:24px;font-weight:600;}
+.setting-desc{color:var(--text-dim);font-size:17px;margin-top:4px;}
+.switch{position:relative;display:inline-block;width:76px;height:42px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;border-radius:999px;background:var(--card-2);border:1px solid var(--line);cursor:pointer;transition:.2s;}
+.slider::before{content:"";position:absolute;width:32px;height:32px;left:4px;top:4px;border-radius:50%;background:var(--text-dim);transition:.2s;}
+.switch input:checked + .slider{background:var(--blue);border-color:var(--blue);}
+.switch input:checked + .slider::before{transform:translateX(34px);background:#06121f;}
+
+/* ============ 模态 ============ */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.72);
+  display:flex;align-items:center;justify-content:center;z-index:100;padding:24px;
+}
+.modal{
+  background:var(--bg-2);border:1px solid var(--line);border-radius:20px;
+  padding:28px;width:min(620px,96vw);max-height:90vh;overflow-y:auto;
+  display:flex;flex-direction:column;gap:18px;
+  box-shadow:var(--shadow);
+}
+.modal h2{font-size:28px;}
+.modal .field{flex-direction:column;gap:8px;}
+.modal .field label{font-size:16px;color:var(--text-dim);}
+.modal .field input,.modal .field textarea{
+  min-height:52px;font-size:19px;border-radius:10px;
+}
+.modal .field textarea{min-height:90px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:6px;}
+.modal-actions .btn{min-height:56px;font-size:19px;}
+.modal-confirm-text{font-size:20px;line-height:1.6;color:var(--text);}
+.modal-confirm-text .warn{color:var(--red);font-weight:700;}
+
+.import-drop{
+  border:2px dashed var(--line);border-radius:14px;padding:34px;text-align:center;
+  color:var(--text-dim);font-size:18px;cursor:pointer;transition:.15s;
+}
+.import-drop:hover{border-color:var(--blue);color:var(--text);}
+.import-result{margin-top:8px;border-top:1px solid var(--line);padding-top:14px;font-size:18px;line-height:1.7;}
+.import-result .ok{color:var(--green);font-weight:700;}
+.import-result .skip{color:var(--amber);}
+.import-format{color:var(--text-dim);font-size:15px;line-height:1.6;background:var(--card);border-radius:10px;padding:12px 14px;white-space:pre-wrap;}
+
+/* ============ 首启引导 ============ */
+.firstrun-box{text-align:center;display:flex;flex-direction:column;gap:18px;align-items:center;}
+.firstrun-box h2{font-size:30px;}
+.firstrun-box p{color:var(--text-dim);font-size:19px;line-height:1.7;}
+.firstrun-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:8px;}
+
+/* ============ Toast ============ */
+#toast-wrap{position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:none;}
+.toast{
+  background:var(--card-2);border:1px solid var(--line);color:var(--text);
+  padding:14px 26px;border-radius:12px;font-size:20px;font-weight:600;
+  box-shadow:var(--shadow);animation:toast-in .25s ease;
+  max-width:90vw;text-align:center;white-space:pre-line;
+}
+.toast.ok{border-color:var(--green);color:var(--green);}
+.toast.err{border-color:var(--red);color:var(--red);}
+@keyframes toast-in{from{opacity:0;transform:translateY(-14px);}to{opacity:1;transform:translateY(0);}}
+
+/* ============ 响应式与动效偏好 ============ */
+@media (max-width:900px){
+  .home-grid{grid-template-columns:repeat(2,1fr);}
+  .btn{padding:0 18px;}
+  .topbar{padding:12px 16px;flex-wrap:wrap;}
+  .topbar h1{font-size:22px;}
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+  .flip-card-inner{transition:none;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ======== 首页 ======== -->
+  <section class="view" id="view-home">
+    <div class="home-wrap">
+      <div>
+        <div class="brand-title">极速识词</div>
+        <div class="brand-sub">课堂互动版</div>
+      </div>
+      <button class="btn btn-hero" data-action="go-setup">开始课堂</button>
+      <div class="home-grid">
+        <button class="tile" data-action="go-packs"><span class="tile-icon">📚</span><span>词库管理</span><span class="tile-stat" id="stat-packs"></span></button>
+        <button class="tile" data-action="go-students"><span class="tile-icon">👥</span><span>学生名单</span><span class="tile-stat" id="stat-students"></span></button>
+        <button class="tile" data-action="go-weak"><span class="tile-icon">📕</span><span>错题本</span><span class="tile-stat" id="stat-weak"></span></button>
+        <button class="tile" data-action="go-backup"><span class="tile-icon">💾</span><span>数据备份</span><span class="tile-stat">离线可用</span></button>
+        <button class="tile" data-action="go-settings"><span class="tile-icon">⚙️</span><span>设置</span><span class="tile-stat" id="stat-settings"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== 课堂设置 ======== -->
+  <section class="view" id="view-setup">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-home">← 返回</button>
+      <h1>课堂设置</h1>
+    </header>
+    <div class="setup-body">
+      <div class="field">
+        <label>词包</label>
+        <select id="setup-pack"></select>
+      </div>
+      <div class="field">
+        <label>课堂模式</label>
+        <div class="seg" id="setup-mode">
+          <button class="seg-btn active" data-mode="browse">教师浏览</button>
+          <button class="seg-btn" data-mode="quiz">快速抢答</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>播放顺序</label>
+        <div class="seg" id="setup-order">
+          <button class="seg-btn" data-order="sequence">顺序</button>
+          <button class="seg-btn active" data-order="shuffle">随机</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>答案方向</label>
+        <div class="seg" id="setup-direction">
+          <button class="seg-btn active" data-direction="word-to-meaning">单词 → 中文</button>
+          <button class="seg-btn" data-direction="meaning-to-word">中文 → 单词</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" data-action="start-class">开始课堂</button>
+    </div>
+  </section>
+
+  <!-- ======== 课堂 ======== -->
+  <section class="view" id="view-classroom">
+    <div class="classroom">
+      <header class="classroom-top">
+        <div class="classroom-meta">
+          <span class="classroom-mode" id="cr-mode">浏览</span>
+          <span id="cr-packname"></span>
+          <span class="dim" id="cr-progress"></span>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-action="toggle-fullscreen">⛶ 全屏</button>
+        <button class="btn btn-ghost btn-sm" data-action="exit-class">退出课堂 Esc</button>
+      </header>
+
+      <div class="stage" id="stage">
+        <div class="quiz-wheel hidden" id="quiz-wheel">?</div>
+        <div class="quiz-pick hidden" id="quiz-pick"></div>
+        <div class="flip-card" id="flip-card">
+          <div class="flip-card-inner">
+            <div class="flip-card-front">
+              <div class="card-word" id="card-front-word"></div>
+              <div class="card-phonetic" id="card-front-phonetic"></div>
+              <div class="card-hint">点击卡片或按 空格 查看答案</div>
+            </div>
+            <div class="flip-card-back">
+              <div class="card-word" id="card-back-word"></div>
+              <div class="card-meaning" id="card-back-meaning"></div>
+              <div class="card-example" id="card-back-example"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="classroom-controls">
+        <div id="cr-browse-controls">
+          <button class="btn btn-ghost" data-action="prev-word">← 上一张</button>
+          <button class="btn btn-ghost" data-action="flip-word">显示答案</button>
+          <button class="btn btn-success" data-action="mark-mastered">掌握 ✓</button>
+          <button class="btn btn-danger" data-action="mark-weak">存疑 ✕</button>
+          <button class="btn btn-primary" data-action="next-word">下一张 →</button>
+        </div>
+        <div id="cr-quiz-controls" class="hidden">
+          <button class="btn btn-ghost" data-action="pick-student">🎯 随机抽人</button>
+          <button class="btn btn-ghost" data-action="flip-word">显示答案</button>
+          <button class="btn btn-success" data-action="judge-correct">答对 ✓</button>
+          <button class="btn btn-danger" data-action="judge-weak">存疑 ✕</button>
+          <button class="btn btn-primary" data-action="next-word">下一题 →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== 词库管理 ======== -->
+  <section class="view" id="view-packs">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-home">← 返回</button>
+      <h1>词库管理</h1>
+      <button class="btn btn-primary" data-action="create-pack">+ 新建词包</button>
+    </header>
+    <div class="list" id="pack-list"></div>
+  </section>
+
+  <!-- ======== 词包详情 ======== -->
+  <section class="view" id="view-pack">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-packs">← 词库管理</button>
+      <h1 id="pack-detail-name"></h1>
+      <button class="btn btn-ghost" data-action="import-words">批量导入</button>
+      <button class="btn btn-ghost" data-action="edit-pack">编辑词包</button>
+      <button class="btn btn-primary" data-action="add-word">+ 添加单词</button>
+    </header>
+    <div class="list" id="word-list"></div>
+  </section>
+
+  <!-- ======== 学生名单 ======== -->
+  <section class="view" id="view-students">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-home">← 返回</button>
+      <h1>学生名单</h1>
+      <button class="btn btn-ghost" data-action="import-students">批量导入</button>
+      <button class="btn btn-primary" data-action="add-student">+ 添加学生</button>
+    </header>
+    <div class="list" id="student-list"></div>
+  </section>
+
+  <!-- ======== 错题本 ======== -->
+  <section class="view" id="view-weak">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-home">← 返回</button>
+      <h1>错题本</h1>
+      <button class="btn btn-primary" id="weak-review-btn">开始复习薄弱词</button>
+    </header>
+    <div class="weak-empty hidden" id="weak-empty">
+      <div class="empty-emoji">🎉</div>
+      <div>太棒了！当前没有薄弱词。</div>
+    </div>
+    <div class="list" id="weak-list"></div>
+  </section>
+
+  <!-- ======== 数据备份 ======== -->
+  <section class="view" id="view-backup">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-home">← 返回</button>
+      <h1>数据备份</h1>
+    </header>
+    <div class="backup-body">
+      <div class="backup-card">
+        <h2>导出备份</h2>
+        <p>将全部词库、学生名单和错题本导出为一个 JSON 文件，可留存或转移。</p>
+        <button class="btn btn-primary" data-action="export-json">导出 JSON 备份</button>
+      </div>
+      <div class="backup-card">
+        <h2>导入恢复</h2>
+        <p>从之前导出的 JSON 文件恢复全部数据（将覆盖当前内容）。</p>
+        <button class="btn btn-ghost" data-action="import-json">导入 JSON 恢复</button>
+      </div>
+      <div class="backup-card">
+        <h2>恢复演示数据</h2>
+        <p>重置为内置演示词库与学生名单（会清空当前数据）。</p>
+        <button class="btn btn-ghost" data-action="restore-demo">恢复演示数据</button>
+      </div>
+      <div class="backup-card danger">
+        <h2>清空全部数据</h2>
+        <p>删除本机保存的所有词库、学生名单与错题本。此操作不可撤销。</p>
+        <button class="btn btn-danger" data-action="clear-all">清空全部数据</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== 设置 ======== -->
+  <section class="view" id="view-settings">
+    <header class="topbar">
+      <button class="btn btn-ghost" data-action="go-home">← 返回</button>
+      <h1>设置</h1>
+    </header>
+    <div class="settings-body">
+      <div class="setting-row">
+        <div><div class="setting-name">音效</div><div class="setting-desc">翻牌、抽人、答对、存疑等提示音（Web Audio 合成）</div></div>
+        <label class="switch"><input type="checkbox" id="setting-sound"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-name">自动下一张</div><div class="setting-desc">点击掌握 / 存疑后自动跳到下一张</div></div>
+        <label class="switch"><input type="checkbox" id="setting-autonext"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-name">关于</div><div class="setting-desc">极速识词 · 课堂互动版 · MVP 1.0 · 单 HTML 离线可用</div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ======== 模态：词包 ======== -->
+<div class="modal-backdrop hidden" id="modal-pack">
+  <div class="modal">
+    <h2 id="pack-modal-title">新建词包</h2>
+    <div class="field"><label>词包名称 *</label><input type="text" id="pack-input-name" placeholder="例如：Unit 1"></div>
+    <div class="field"><label>描述</label><input type="text" id="pack-input-desc" placeholder="例如：第一单元核心词汇"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-pack">取消</button>
+      <button class="btn btn-primary" data-action="save-pack">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 模态：单词 ======== -->
+<div class="modal-backdrop hidden" id="modal-word">
+  <div class="modal">
+    <h2 id="word-modal-title">编辑单词</h2>
+    <div class="field"><label>英文单词 *</label><input type="text" id="w-word" placeholder="apple"></div>
+    <div class="field"><label>音标</label><input type="text" id="w-phonetic" placeholder="/ˈæpəl/"></div>
+    <div class="field"><label>中文释义 *</label><input type="text" id="w-meaning" placeholder="苹果"></div>
+    <div class="field"><label>例句</label><textarea id="w-example" placeholder="I eat an apple every day."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-word">取消</button>
+      <button class="btn btn-primary" data-action="save-word">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 模态：学生 ======== -->
+<div class="modal-backdrop hidden" id="modal-student">
+  <div class="modal">
+    <h2 id="student-modal-title">添加学生</h2>
+    <div class="field"><label>姓名 *</label><input type="text" id="s-name" placeholder="小明"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-student">取消</button>
+      <button class="btn btn-primary" data-action="save-student">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 模态：批量导入 ======== -->
+<div class="modal-backdrop hidden" id="modal-import">
+  <div class="modal">
+    <h2 id="import-modal-title">批量导入</h2>
+    <div class="import-format" id="import-format-hint"></div>
+    <div class="import-drop" id="import-drop">点击选择文件（TXT / CSV / JSON）</div>
+    <input type="file" id="import-file" accept=".txt,.csv,.json" class="hidden">
+    <div class="import-result hidden" id="import-result"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-import">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 模态：确认 ======== -->
+<div class="modal-backdrop hidden" id="modal-confirm">
+  <div class="modal">
+    <h2 id="confirm-title">请确认</h2>
+    <div class="modal-confirm-text" id="confirm-text"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="confirm-cancel">取消</button>
+      <button class="btn btn-danger" id="confirm-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 首启引导 ======== -->
+<div class="modal-backdrop hidden" id="firstrun">
+  <div class="modal">
+    <div class="firstrun-box">
+      <h2>👋 欢迎使用极速识词</h2>
+      <p>已为您加载演示词库「Unit 1 · Everyday English」和演示学生名单。<br>现在就可以直接点击「开始课堂」体验完整流程。</p>
+      <div class="firstrun-actions">
+        <button class="btn btn-primary" data-action="go-setup">直接开始体验</button>
+        <button class="btn btn-ghost" data-action="clear-demo">清空演示数据</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+"use strict";
+(function(){
+/* ============================================================
+ * Utils —— 通用工具
+ * ==========================================================*/
+const Utils = {
+  uid(prefix){
+    return (prefix || "id") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  },
+  shuffle(arr){
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+  now(){ return Date.now(); },
+  formatDate(ts){
+    const d = new Date(ts);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  },
+  esc(s){ return String(s); }, // 所有用户文本一律使用 textContent 写入，杜绝 innerHTML 注入
+  fileDownload(filename, text){
+    const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+};
+
+/* ============================================================
+ * 数据模型与 Store —— LocalStorage / 迁移 / 备份
+ * ==========================================================*/
+const STORAGE_KEY = "speedword_classroom_data";
+const DATA_VERSION = 1;
+
+function defaultAppData(){
+  return {
+    version: DATA_VERSION,
+    settings: {
+      theme: "dark",
+      defaultMode: "browse",
+      soundEnabled: true,
+      autoNext: false
+    },
+    wordPacks: [],
+    students: [],
+    weakWords: [],
+    statistics: {
+      totalReviewed: 0,
+      masteredCount: 0,
+      weakCount: 0
+    }
+  };
+}
+
+const Store = {
+  data: defaultAppData(),
+
+  load(){
+    let saved = null;
+    try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) { saved = null; }
+    if (!saved) return false;
+    try {
+      const parsed = JSON.parse(saved);
+      Store.data = Store.migrate(parsed);
+      return true;
+    } catch (e) {
+      console.error("本地数据解析失败，使用默认数据", e);
+      return false;
+    }
+  },
+
+  save(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Store.data));
+    } catch (e) {
+      console.error("保存失败", e);
+      UI.toast("保存失败，浏览器存储空间可能已满", "err");
+    }
+  },
+
+  migrate(raw){
+    // 未来版本升级入口：按 raw.version 逐级迁移
+    if (!raw || typeof raw !== "object") return defaultAppData();
+    const base = defaultAppData();
+    const data = Object.assign(base, raw);
+    if (!Array.isArray(data.wordPacks)) data.wordPacks = [];
+    if (!Array.isArray(data.students)) data.students = [];
+    if (!Array.isArray(data.weakWords)) data.weakWords = [];
+    if (!data.statistics) data.statistics = base.statistics;
+    if (!data.settings) data.settings = base.settings;
+    data.version = DATA_VERSION;
+    return data;
+  },
+
+  exportJSON(){
+    return JSON.stringify(Store.data, null, 2);
+  },
+
+  // 校验并恢复备份 JSON
+  importBackup(text){
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (e) {
+      return { ok: false, error: "导入失败：JSON 文件格式不正确。\n请检查文件后重新导入。" };
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, error: "导入失败：JSON 根节点不是预期的备份对象。\n请选择由本应用导出的备份文件。" };
+    }
+    const migrated = Store.migrate(parsed);
+    if (!Array.isArray(migrated.wordPacks)) {
+      return { ok: false, error: "导入失败：文件中缺少词库数据。" };
+    }
+    Store.data = migrated;
+    Store.save();
+    return { ok: true };
+  },
+
+  clearAll(){
+    Store.data = defaultAppData();
+    Store.save();
+  }
+};
+
+/* ============================================================
+ * 演示数据
+ * ==========================================================*/
+const DEMO_PACK = {
+  name: "Unit 1 · Everyday English",
+  description: "第一单元 · 日常英语核心词汇",
+  words: [
+    { word: "apple",      phonetic: "/ˈæpəl/",        meaning: "苹果",   example: "I eat an apple every day." },
+    { word: "book",       phonetic: "/bʊk/",          meaning: "书",     example: "This is my English book." },
+    { word: "teacher",    phonetic: "/ˈtiːtʃər/",     meaning: "老师",   example: "Our teacher is very kind." },
+    { word: "student",    phonetic: "/ˈstjuːdnt/",    meaning: "学生",   example: "She is a good student." },
+    { word: "classroom",  phonetic: "/ˈklɑːsruːm/",   meaning: "教室",   example: "The classroom is clean." },
+    { word: "friend",     phonetic: "/frend/",        meaning: "朋友",   example: "Tom is my best friend." },
+    { word: "happy",      phonetic: "/ˈhæpi/",        meaning: "快乐的", example: "I am very happy today." },
+    { word: "beautiful",  phonetic: "/ˈbjuːtɪfl/",    meaning: "美丽的", example: "What a beautiful flower!" },
+    { word: "school",     phonetic: "/skuːl/",        meaning: "学校",   example: "I go to school by bus." },
+    { word: "morning",    phonetic: "/ˈmɔːrnɪŋ/",     meaning: "早晨",   example: "Good morning, everyone!" }
+  ]
+};
+
+const DEMO_STUDENTS = ["小明", "小红", "小刚", "小美", "小杰", "小雨", "小宇", "小芳"];
+
+function seedDemo(){
+  const d = Store.data;
+  const now = Utils.now();
+  const pack = {
+    id: Utils.uid("pack"),
+    name: DEMO_PACK.name,
+    description: DEMO_PACK.description,
+    words: DEMO_PACK.words.map(w => ({
+      id: Utils.uid("word"),
+      word: w.word,
+      phonetic: w.phonetic,
+      meaning: w.meaning,
+      example: w.example,
+      status: "unknown",
+      createdAt: now,
+      updatedAt: now
+    })),
+    createdAt: now,
+    updatedAt: now
+  };
+  d.wordPacks = [pack];
+  d.students = DEMO_STUDENTS.map(name => ({
+    id: Utils.uid("student"),
+    name: name,
+    enabled: true,
+    callCount: 0,
+    correctCount: 0,
+    weakCount: 0
+  }));
+  d.weakWords = [];
+  d.statistics = defaultAppData().statistics;
+  Store.save();
+}
+
+/* ============================================================
+ * WordBank —— 词包与单词 CRUD、导入合并、错题复习队列
+ * ==========================================================*/
+const WordBank = {
+  all(){ return Store.data.wordPacks; },
+  get(packId){ return Store.data.wordPacks.find(p => p.id === packId); },
+  create(name, desc){
+    if (!name || !name.trim()) return null;
+    const now = Utils.now();
+    const pack = { id: Utils.uid("pack"), name: name.trim(), description: (desc || "").trim(), words: [], createdAt: now, updatedAt: now };
+    Store.data.wordPacks.push(pack);
+    Store.save();
+    return pack;
+  },
+  update(packId, name, desc){
+    const p = WordBank.get(packId);
+    if (!p) return null;
+    p.name = (name || "").trim();
+    p.description = (desc || "").trim();
+    p.updatedAt = Utils.now();
+    Store.save();
+    return p;
+  },
+  remove(packId){
+    Store.data.wordPacks = Store.data.wordPacks.filter(p => p.id !== packId);
+    Store.data.weakWords = Store.data.weakWords.filter(w => w.packId !== packId);
+    Store.save();
+  },
+  addWord(packId, f){
+    const p = WordBank.get(packId);
+    if (!p || !f.word || !f.word.trim() || !f.meaning || !f.meaning.trim()) return null;
+    const now = Utils.now();
+    const w = { id: Utils.uid("word"), word: f.word.trim(), phonetic: (f.phonetic || "").trim(), meaning: f.meaning.trim(), example: (f.example || "").trim(), status: "unknown", createdAt: now, updatedAt: now };
+    p.words.push(w);
+    p.updatedAt = now;
+    Store.save();
+    return w;
+  },
+  updateWord(packId, wordId, f){
+    const p = WordBank.get(packId);
+    if (!p) return null;
+    const w = p.words.find(x => x.id === wordId);
+    if (!w) return null;
+    if (f.word != null) w.word = f.word.trim();
+    if (f.phonetic != null) w.phonetic = f.phonetic.trim();
+    if (f.meaning != null) w.meaning = f.meaning.trim();
+    if (f.example != null) w.example = f.example.trim();
+    w.updatedAt = Utils.now();
+    p.updatedAt = Utils.now();
+    Store.save();
+    return w;
+  },
+  removeWord(packId, wordId){
+    const p = WordBank.get(packId);
+    if (!p) return;
+    p.words = p.words.filter(x => x.id !== wordId);
+    Store.data.weakWords = Store.data.weakWords.filter(w => w.wordId !== wordId);
+    p.updatedAt = Utils.now();
+    Store.save();
+  },
+  setStatus(packId, wordId, status){
+    const p = WordBank.get(packId);
+    if (!p) return;
+    const w = p.words.find(x => x.id === wordId);
+    if (!w) return;
+    w.status = status;
+    w.updatedAt = Utils.now();
+    p.updatedAt = Utils.now();
+    Store.save();
+  },
+  mergeImport(packId, items){
+    const p = WordBank.get(packId);
+    if (!p) return null;
+    const existing = new Set(p.words.map(w => w.word.trim().toLowerCase()));
+    const now = Utils.now();
+    let added = 0;
+    for (const it of items) {
+      const key = (it.word || "").trim().toLowerCase();
+      if (!key || existing.has(key)) continue;
+      existing.add(key);
+      p.words.push({
+        id: Utils.uid("word"), word: it.word.trim(), phonetic: it.phonetic || "", meaning: it.meaning || "", example: it.example || "",
+        status: "unknown", createdAt: now, updatedAt: now
+      });
+      added++;
+    }
+    if (added) p.updatedAt = now;
+    Store.save();
+    return added;
+  },
+  weakQueue(){
+    const queue = [];
+    for (const wk of Store.data.weakWords) {
+      const pack = WordBank.get(wk.packId);
+      if (!pack) continue;
+      const w = pack.words.find(x => x.id === wk.wordId);
+      if (w) queue.push({ pack, word: w });
+    }
+    return queue;
+  }
+};
+
+/* ============================================================
+ * WeakBook —— 错题本
+ * ==========================================================*/
+const WeakBook = {
+  all(){ return Store.data.weakWords; },
+  mark(packId, wordId){
+    const entry = Store.data.weakWords.find(w => w.packId === packId && w.wordId === wordId);
+    if (entry) {
+      entry.weakCount += 1;
+      entry.lastMarkedAt = Utils.now();
+    } else {
+      const pack = WordBank.get(packId);
+      const w = pack && pack.words.find(x => x.id === wordId);
+      if (!pack || !w) return;
+      Store.data.weakWords.push({
+        wordId, packId,
+        word: w.word, meaning: w.meaning,
+        lastMarkedAt: Utils.now(), weakCount: 1
+      });
+    }
+    Store.data.statistics.weakCount = Store.data.weakWords.length;
+    Store.save();
+  },
+  remove(packId, wordId){
+    Store.data.weakWords = Store.data.weakWords.filter(w => !(w.packId === packId && w.wordId === wordId));
+    Store.data.statistics.weakCount = Store.data.weakWords.length;
+    Store.save();
+  }
+};
+
+/* ============================================================
+ * Students —— 名单管理、公平抽取、课堂统计
+ * ==========================================================*/
+const Students = {
+  all(){ return Store.data.students; },
+  get(id){ return Store.data.students.find(s => s.id === id); },
+  add(name, enabled){
+    if (!name || !name.trim()) return null;
+    const s = { id: Utils.uid("student"), name: name.trim(), enabled: enabled !== false, callCount: 0, correctCount: 0, weakCount: 0 };
+    Store.data.students.push(s);
+    Store.save();
+    return s;
+  },
+  update(id, name, enabled){
+    const s = Students.get(id);
+    if (!s) return null;
+    s.name = (name || "").trim();
+    s.enabled = enabled !== false;
+    Store.save();
+    return s;
+  },
+  remove(id){
+    Store.data.students = Store.data.students.filter(s => s.id !== id);
+    Store.save();
+  },
+  toggle(id){
+    const s = Students.get(id);
+    if (!s) return;
+    s.enabled = !s.enabled;
+    Store.save();
+  },
+  enabledList(){ return Store.data.students.filter(s => s.enabled); },
+  // 公平抽人：排除上一位 + 最少抽取次数优先 + 同次数随机
+  pick(lastStudentId){
+    const enabled = Students.enabledList();
+    if (!enabled.length) return null;
+    const available = enabled.filter(s => s.id !== lastStudentId);
+    const pool = available.length ? available : enabled;
+    const minCount = Math.min(...pool.map(s => s.callCount));
+    const fairPool = pool.filter(s => s.callCount === minCount);
+    const chosen = fairPool[Math.floor(Math.random() * fairPool.length)];
+    chosen.callCount += 1;
+    Store.save();
+    return chosen;
+  },
+  record(id, type){
+    const s = Students.get(id);
+    if (!s) return;
+    if (type === "correct") s.correctCount += 1;
+    else if (type === "weak") s.weakCount += 1;
+    Store.save();
+  },
+  importNames(names){
+    const existing = new Set(Store.data.students.map(s => s.name.trim()));
+    let added = 0;
+    for (const name of names) {
+      const t = (name || "").trim();
+      if (!t || existing.has(t)) continue;
+      existing.add(t);
+      Students.add(t, true);
+      added++;
+    }
+    return added;
+  }
+};
+
+/* ============================================================
+ * Importer —— TXT / CSV / JSON 解析与校验
+ * ==========================================================*/
+const Importer = {
+  parseTXT(text){
+    const items = [], skipped = [];
+    const lines = text.split(/\r?\n/);
+    lines.forEach((raw, idx) => {
+      const line = raw.trim();
+      if (!line) return;
+      const parts = line.split("|").map(s => s.trim());
+      const [word, phonetic, meaning, example] = parts;
+      if (!word) { skipped.push({ line: idx + 1, reason: "缺少单词" }); return; }
+      if (!meaning) { skipped.push({ line: idx + 1, reason: "缺少中文释义" }); return; }
+      items.push({ word, phonetic: phonetic || "", meaning, example: example || "" });
+    });
+    return { items, skipped };
+  },
+  csvRows(text){
+    const rows = []; let row = [], field = "", inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false;
+        } else field += c;
+      } else if (c === '"') {
+        inQ = true;
+      } else if (c === ",") {
+        row.push(field); field = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); field = "";
+        if (row.some(x => x.trim() !== "")) rows.push(row);
+        row = [];
+      } else field += c;
+    }
+    if (field !== "" || row.length) { row.push(field); if (row.some(x => x.trim() !== "")) rows.push(row); }
+    return rows;
+  },
+  parseCSV(text){
+    const items = [], skipped = [];
+    const rows = Importer.csvRows(text);
+    if (!rows.length) return { items, skipped };
+    const header = rows[0].map(h => h.trim().toLowerCase());
+    const find = names => { for (const n of names) { const i = header.indexOf(n); if (i >= 0) return i; } return -1; };
+    const idxW = find(["word", "单词"]);
+    const idxP = find(["phonetic", "音标"]);
+    const idxM = find(["meaning", "释义", "中文"]);
+    const idxE = find(["example", "例句"]);
+    rows.slice(1).forEach((cols, i) => {
+      const word = (idxW >= 0 ? cols[idxW] : cols[0] || "").trim();
+      const meaning = (idxM >= 0 ? cols[idxM] : cols[2] || "").trim();
+      if (!word) { skipped.push({ line: i + 2, reason: "缺少单词" }); return; }
+      if (!meaning) { skipped.push({ line: i + 2, reason: "缺少中文释义" }); return; }
+      items.push({
+        word,
+        phonetic: (idxP >= 0 ? cols[idxP] : cols[1] || "").trim(),
+        meaning,
+        example: (idxE >= 0 ? cols[idxE] : cols[3] || "").trim()
+      });
+    });
+    return { items, skipped };
+  },
+  parseJSON(text){
+    let data;
+    try { data = JSON.parse(text); } catch (e) {
+      return { fatal: "导入失败：JSON 文件格式不正确。\n请检查文件后重新导入。" };
+    }
+    if (!Array.isArray(data)) {
+      return { fatal: "导入失败：JSON 根节点应为单词数组（例如 [{word, meaning, ...}]）。" };
+    }
+    const items = [], skipped = [];
+    data.forEach((it, i) => {
+      if (!it || typeof it !== "object") { skipped.push({ line: i + 1, reason: "不是对象" }); return; }
+      const word = String(it.word || "").trim();
+      const meaning = String(it.meaning || "").trim();
+      if (!word) { skipped.push({ line: i + 1, reason: "缺少单词" }); return; }
+      if (!meaning) { skipped.push({ line: i + 1, reason: "缺少中文释义" }); return; }
+      items.push({ word, phonetic: String(it.phonetic || "").trim(), meaning, example: String(it.example || "").trim() });
+    });
+    return { items, skipped };
+  },
+  parseByExt(filename, text){
+    const ext = (filename.split(".").pop() || "").toLowerCase();
+    if (ext === "txt") return Importer.parseTXT(text);
+    if (ext === "csv") return Importer.parseCSV(text);
+    if (ext === "json") return Importer.parseJSON(text);
+    const t = text.trim();
+    if (t.startsWith("[") || t.startsWith("{")) return Importer.parseJSON(text);
+    if (t.includes(",") && !t.includes("|")) return Importer.parseCSV(text);
+    return Importer.parseTXT(text);
+  }
+};
+
+/* ============================================================
+ * Sound —— Web Audio 合成提示音（可一键关闭）
+ * ==========================================================*/
+const Sound = {
+  ctx: null,
+  ensure(){
+    try {
+      if (!Sound.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        Sound.ctx = new AC();
+      }
+      if (Sound.ctx.state === "suspended") Sound.ctx.resume();
+    } catch (e) { /* 音频不可用时静默 */ }
+  },
+  tone(freq, dur, type, gain){
+    if (!Store.data.settings.soundEnabled) return;
+    Sound.ensure();
+    if (!Sound.ctx) return;
+    try {
+      const o = Sound.ctx.createOscillator();
+      const g = Sound.ctx.createGain();
+      o.type = type || "sine";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(gain || 0.1, Sound.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, Sound.ctx.currentTime + dur);
+      o.connect(g); g.connect(Sound.ctx.destination);
+      o.start();
+      o.stop(Sound.ctx.currentTime + dur);
+    } catch (e) {}
+  },
+  flip(){ Sound.tone(440, .12, "sine", .08); },
+  next(){ Sound.tone(330, .1, "triangle", .07); },
+  correct(){ Sound.tone(523, .12, "triangle", .1); setTimeout(() => Sound.tone(784, .16, "triangle", .1), 110); },
+  weak(){ Sound.tone(180, .22, "sawtooth", .08); },
+  pick(){ Sound.tone(392, .08, "square", .05); setTimeout(() => Sound.tone(523, .1, "square", .05), 90); }
+};
+
+/* ============================================================
+ * Setup —— 课堂开始设置（记忆最近选择）
+ * ==========================================================*/
+const Setup = {
+  packId: null,
+  mode: "browse",
+  order: "shuffle",
+  direction: "word-to-meaning"
+};
+
+/* ============================================================
+ * Classroom —— 课堂状态机
+ *   START → SHOW_WORD → FLIPPED → MARKED → NEXT
+ * ==========================================================*/
+const Classroom = {
+  state: {
+    active: false,
+    mode: "browse",            // browse | quiz
+    direction: "word-to-meaning",
+    shuffled: true,
+    isReview: false,
+    pack: null,
+    queue: [],                 // [{ pack, word }]
+    currentIndex: 0,
+    currentItem: null,
+    flipped: false,
+    markedStatus: null,
+    lastStudentId: null,
+    selectedStudentId: null,
+    transitioning: false
+  },
+  start(opts){
+    const st = Classroom.state;
+    st.active = true;
+    st.mode = opts.mode || "browse";
+    st.direction = opts.direction || "word-to-meaning";
+    st.shuffled = opts.shuffled !== false;
+    st.isReview = !!opts.isReview;
+    st.pack = opts.pack || null;
+    st.flipped = false;
+    st.markedStatus = null;
+    st.lastStudentId = null;
+    st.selectedStudentId = null;
+    st.transitioning = false;
+    let items;
+    if (opts.items) items = opts.items;
+    else if (opts.pack) items = opts.pack.words.map(w => ({ pack: opts.pack, word: w }));
+    else items = [];
+    st.queue = st.shuffled ? Utils.shuffle(items) : items;
+    st.currentIndex = 0;
+    st.currentItem = st.queue[0] || null;
+    UI.showView("classroom");
+  },
+  exit(){
+    Classroom.state.active = false;
+    UI.showView("home");
+  },
+  cur(){ return Classroom.state.currentItem; },
+  show(item, idx){
+    const st = Classroom.state;
+    st.currentIndex = idx;
+    st.currentItem = item;
+    st.flipped = false;
+    const card = document.getElementById("flip-card");
+    card.classList.remove("is-flipped");
+    UI.renderClassroomWord();
+  },
+  flip(){
+    const st = Classroom.state;
+    if (st.transitioning || !Classroom.cur() || st.flipped || st.mode === "quiz" && UI.wheelRunning) return;
+    st.transitioning = true;
+    const card = document.getElementById("flip-card");
+    card.classList.add("is-flipped");
+    Sound.flip();
+    setTimeout(() => {
+      st.flipped = true;
+      st.transitioning = false;
+      UI.updateClassroomControls();
+    }, 320);
+  },
+  next(){
+    const st = Classroom.state;
+    if (st.transitioning || !st.active || UI.wheelRunning) return;
+    if (st.currentIndex < st.queue.length - 1) {
+      Sound.next();
+      st.currentIndex += 1;
+      Classroom.show(st.queue[st.currentIndex], st.currentIndex);
+    } else {
+      UI.toast(st.isReview ? "复习完成 🎉" : "已到本轮最后一张 🎉", "ok");
+    }
+  },
+  prev(){
+    const st = Classroom.state;
+    if (st.transitioning || !st.active || UI.wheelRunning) return;
+    if (st.currentIndex > 0) {
+      Sound.next();
+      st.currentIndex -= 1;
+      Classroom.show(st.queue[st.currentIndex], st.currentIndex);
+    }
+  },
+  markMastered(){
+    const st = Classroom.state;
+    const item = Classroom.cur();
+    if (!item || st.transitioning || st.markedStatus) return;
+    WordBank.setStatus(item.pack.id, item.word.id, "mastered");
+    Store.data.statistics.masteredCount += 1;
+    Store.data.statistics.totalReviewed += 1;
+    WeakBook.remove(item.pack.id, item.word.id);
+    Store.save();
+    Sound.correct();
+    UI.renderClassroomCardStatus("mastered");
+    UI.toast("已掌握 ✓", "ok");
+    if (Store.data.settings.autoNext) setTimeout(() => Classroom.next(), 350);
+  },
+  markWeak(){
+    const st = Classroom.state;
+    const item = Classroom.cur();
+    if (!item || st.transitioning || st.markedStatus) return;
+    WordBank.setStatus(item.pack.id, item.word.id, "weak");
+    Store.data.statistics.weakCount += 1;
+    Store.data.statistics.totalReviewed += 1;
+    WeakBook.mark(item.pack.id, item.word.id);
+    Store.save();
+    Sound.weak();
+    UI.renderClassroomCardStatus("weak");
+    UI.toast("已加入错题本 ✕", "err");
+    if (Store.data.settings.autoNext) setTimeout(() => Classroom.next(), 350);
+  },
+  pickStudent(){
+    const st = Classroom.state;
+    if (st.transitioning || st.selectedStudentId || UI.wheelRunning) return;
+    const chosen = Students.pick(st.lastStudentId);
+    if (!chosen) { UI.toast("没有可用学生，请先在「学生名单」中添加", "err"); return; }
+    st.lastStudentId = chosen.id;
+    st.selectedStudentId = chosen.id;
+    Sound.pick();
+    UI.renderQuizWheel(chosen);
+  },
+  judge(type){
+    const st = Classroom.state;
+    if (!st.selectedStudentId) { UI.toast("请先「随机抽人」", "err"); return; }
+    const ok = type === "correct";
+    Students.record(st.selectedStudentId, ok ? "correct" : "weak");
+    const item = Classroom.cur();
+    if (item) {
+      WordBank.setStatus(item.pack.id, item.word.id, ok ? "mastered" : "weak");
+      Store.data.statistics.totalReviewed += 1;
+      if (ok) {
+        Store.data.statistics.masteredCount += 1;
+        WeakBook.remove(item.pack.id, item.word.id);
+      } else {
+        Store.data.statistics.weakCount += 1;
+        WeakBook.mark(item.pack.id, item.word.id);
+      }
+      Store.save();
+    }
+    st.selectedStudentId = null;
+    UI.renderQuizPickResult(null);
+    UI.toast(ok ? "答对 ✓" : "存疑 ✕", ok ? "ok" : "err");
+    UI.updateClassroomControls();
+  }
+};
+
+/* ============================================================
+ * UI —— 渲染 / 模态 / Toast / 视图切换
+ * ==========================================================*/
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function readFileAsText(file, cb){
+  const reader = new FileReader();
+  reader.onload = () => cb(String(reader.result || ""));
+  reader.onerror = () => UI.toast("文件读取失败，请重试", "err");
+  reader.readAsText(file);
+}
+
+const UI = {
+  modalStack: [],
+  wheelRunning: false,
+  openModal(id){
+    document.getElementById(id).classList.remove("hidden");
+    if (UI.modalStack.indexOf(id) < 0) UI.modalStack.push(id);
+  },
+  closeModal(id){
+    document.getElementById(id).classList.add("hidden");
+    UI.modalStack = UI.modalStack.filter(x => x !== id);
+  },
+  closeTopModal(){
+    const id = UI.modalStack[UI.modalStack.length - 1];
+    if (id) UI.closeModal(id);
+  },
+  isModalOpen(){ return UI.modalStack.length > 0; },
+
+  showView(name, param){
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    const target = document.getElementById("view-" + name);
+    if (target) target.classList.add("active");
+    App.currentView = name;
+    if (name === "home") UI.renderHome();
+    else if (name === "setup") UI.renderSetup();
+    else if (name === "packs") UI.renderPacks();
+    else if (name === "pack") { App.packId = param; UI.renderPackDetail(param); }
+    else if (name === "students") UI.renderStudents();
+    else if (name === "weak") UI.renderWeak();
+    else if (name === "settings") UI.renderSettings();
+    else if (name === "classroom") UI.renderClassroom();
+  },
+
+  toast(msg, type){
+    const wrap = document.getElementById("toast-wrap");
+    const t = el("div", "toast" + (type === "ok" ? " ok" : type === "err" ? " err" : ""), msg);
+    wrap.appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = "0";
+      t.style.transition = "opacity .3s";
+      setTimeout(() => t.remove(), 320);
+    }, 2400);
+  },
+
+  // ---- 首页 ----
+  renderHome(){
+    const d = Store.data;
+    const totalWords = d.wordPacks.reduce((s, p) => s + p.words.length, 0);
+    document.getElementById("stat-packs").textContent = d.wordPacks.length + " 个词包 · " + totalWords + " 词";
+    document.getElementById("stat-students").textContent = d.students.length + " 名学生";
+    document.getElementById("stat-weak").textContent = d.weakWords.length + " 个薄弱词";
+    document.getElementById("stat-settings").textContent = d.settings.soundEnabled ? "音效开" : "音效关";
+  },
+
+  // ---- 课堂设置 ----
+  renderSetup(){
+    const sel = document.getElementById("setup-pack");
+    sel.innerHTML = "";
+    const packs = WordBank.all();
+    if (!packs.length) {
+      const o = document.createElement("option");
+      o.value = "";
+      o.textContent = "（暂无词包，请先在「词库管理」中创建）";
+      sel.appendChild(o);
+      Setup.packId = "";
+    } else {
+      const valid = packs.some(p => p.id === Setup.packId);
+      const selected = valid ? Setup.packId : packs[0].id;
+      packs.forEach(p => {
+        const o = document.createElement("option");
+        o.value = p.id;
+        o.textContent = p.name + (p.words.length ? "（" + p.words.length + " 词）" : "（空）");
+        sel.appendChild(o);
+      });
+      sel.value = selected;
+      Setup.packId = selected;
+    }
+    document.querySelectorAll("#setup-mode .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === Setup.mode));
+    document.querySelectorAll("#setup-order .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.order === Setup.order));
+    document.querySelectorAll("#setup-direction .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.direction === Setup.direction));
+  },
+
+  // ---- 词库管理 ----
+  renderPacks(){
+    const list = document.getElementById("pack-list");
+    list.innerHTML = "";
+    const packs = WordBank.all();
+    if (!packs.length) {
+      list.appendChild(el("div", "weak-empty", "还没有词包，点击右上角「新建词包」开始"));
+      return;
+    }
+    packs.forEach(p => {
+      const row = el("div", "list-row");
+      const main = el("div", "row-main");
+      const title = el("div", "row-title", p.name);
+      const sub = el("div", "row-sub", (p.description || "无描述") + " · 更新于 " + Utils.formatDate(p.updatedAt));
+      main.append(title, sub);
+      const count = el("div", "row-count", p.words.length + " 词");
+      const open = el("button", "btn btn-ghost", "打开"); open.dataset.action = "open-pack"; open.dataset.packId = p.id;
+      const edit = el("button", "btn btn-ghost", "编辑"); edit.dataset.action = "edit-pack-row"; edit.dataset.packId = p.id;
+      const del = el("button", "btn btn-danger", "删除"); del.dataset.action = "del-pack-row"; del.dataset.packId = p.id;
+      row.append(main, count, open, edit, del);
+      list.appendChild(row);
+    });
+  },
+
+  renderPackDetail(packId){
+    const p = WordBank.get(packId);
+    if (!p) { UI.showView("packs"); return; }
+    document.getElementById("pack-detail-name").textContent = p.name;
+    const list = document.getElementById("word-list");
+    list.innerHTML = "";
+    if (!p.words.length) {
+      list.appendChild(el("div", "weak-empty", "该词包还没有单词，点击「添加单词」或「批量导入」"));
+    } else {
+      p.words.forEach(w => {
+        const row = el("div", "list-row");
+        const main = el("div", "row-main");
+        const title = el("div", "row-title", w.word + (w.phonetic ? "  " + w.phonetic : ""));
+        const sub = el("div", "row-sub", w.meaning + (w.example ? " · " + w.example : ""));
+        main.append(title, sub);
+        const badge = w.status === "mastered" ? el("span", "badge green", "已掌握")
+                     : w.status === "weak" ? el("span", "badge red", "存疑")
+                     : el("span", "row-count", "");
+        const edit = el("button", "btn btn-ghost", "编辑"); edit.dataset.action = "edit-word-row"; edit.dataset.wordId = w.id;
+        const del = el("button", "btn btn-danger", "删除"); del.dataset.action = "del-word-row"; del.dataset.wordId = w.id;
+        row.append(main, badge, edit, del);
+        list.appendChild(row);
+      });
+    }
+  },
+
+  // ---- 学生名单 ----
+  renderStudents(){
+    const list = document.getElementById("student-list");
+    list.innerHTML = "";
+    const students = Students.all();
+    if (!students.length) {
+      list.appendChild(el("div", "weak-empty", "还没有学生，点击右上角「添加学生」"));
+      return;
+    }
+    students.forEach(s => {
+      const row = el("div", "list-row");
+      const main = el("div", "row-main");
+      const title = el("div", "row-title", s.name + (s.enabled ? "" : "（已停用）"));
+      const sub = el("div", "row-sub", "抽中 " + s.callCount + " 次 · 答对 " + s.correctCount + " · 存疑 " + s.weakCount);
+      main.append(title, sub);
+      const toggle = el("button", "btn btn-ghost", s.enabled ? "停用" : "启用");
+      toggle.dataset.action = "toggle-student"; toggle.dataset.studentId = s.id;
+      const edit = el("button", "btn btn-ghost", "编辑"); edit.dataset.action = "edit-student-row"; edit.dataset.studentId = s.id;
+      const del = el("button", "btn btn-danger", "删除"); del.dataset.action = "del-student-row"; del.dataset.studentId = s.id;
+      row.append(main, toggle, edit, del);
+      list.appendChild(row);
+    });
+  },
+
+  // ---- 错题本 ----
+  renderWeak(){
+    const list = document.getElementById("weak-list");
+    const empty = document.getElementById("weak-empty");
+    const btn = document.getElementById("weak-review-btn");
+    list.innerHTML = "";
+    const weak = WeakBook.all();
+    if (!weak.length) {
+      empty.classList.remove("hidden");
+      btn.disabled = true;
+      return;
+    }
+    empty.classList.add("hidden");
+    btn.disabled = false;
+    const sorted = [...weak].sort((a, b) => b.lastMarkedAt - a.lastMarkedAt);
+    sorted.forEach(w => {
+      const row = el("div", "list-row");
+      const main = el("div", "row-main");
+      const title = el("div", "row-title", w.word);
+      const sub = el("div", "row-sub", w.meaning);
+      main.append(title, sub);
+      const badge = el("span", "badge dim", "已标记 " + w.weakCount + " 次");
+      const open = el("button", "btn btn-ghost", "打开词包"); open.dataset.action = "weak-open"; open.dataset.packId = w.packId;
+      const del = el("button", "btn btn-danger", "移除"); del.dataset.action = "weak-del"; del.dataset.packId = w.packId; del.dataset.wordId = w.wordId;
+      row.append(main, badge, open, del);
+      list.appendChild(row);
+    });
+  },
+
+  // ---- 设置 ----
+  renderSettings(){
+    document.getElementById("setting-sound").checked = !!Store.data.settings.soundEnabled;
+    document.getElementById("setting-autonext").checked = !!Store.data.settings.autoNext;
+  },
+
+  // ---- 课堂 ----
+  renderClassroom(){
+    const st = Classroom.state;
+    document.getElementById("cr-mode").textContent = st.mode === "quiz" ? "⚡ 快速抢答" : "📖 教师浏览";
+    document.getElementById("cr-packname").textContent = st.isReview ? "薄弱词复习" : (st.pack ? st.pack.name : "");
+    document.getElementById("cr-browse-controls").classList.toggle("hidden", st.mode !== "browse");
+    document.getElementById("cr-quiz-controls").classList.toggle("hidden", st.mode !== "quiz");
+    document.getElementById("quiz-wheel").classList.add("hidden");
+    document.getElementById("quiz-pick").classList.add("hidden");
+    const card = document.getElementById("flip-card");
+    card.classList.remove("is-flipped");
+    UI.renderClassroomWord();
+    UI.updateClassroomControls();
+  },
+
+  renderClassroomWord(){
+    const st = Classroom.state;
+    const item = st.queue[st.currentIndex];
+    if (!item) return;
+    const w = item.word;
+    document.getElementById("card-front-word").textContent = st.direction === "word-to-meaning" ? w.word : w.meaning;
+    document.getElementById("card-front-phonetic").textContent = w.phonetic || "";
+    document.getElementById("card-back-word").textContent = w.word;
+    document.getElementById("card-back-meaning").textContent = w.meaning;
+    document.getElementById("card-back-example").textContent = w.example || "";
+    document.getElementById("cr-progress").textContent = (st.currentIndex + 1) + " / " + st.queue.length;
+    // 状态角标
+    const old = document.querySelector(".card-status");
+    if (old) old.remove();
+    st.markedStatus = null;
+    if (w.status === "mastered" || w.status === "weak") {
+      st.markedStatus = w.status;
+      const badge = el("div", "card-status " + (w.status === "mastered" ? "mastered" : "weak"), w.status === "mastered" ? "已掌握 ✓" : "存疑 ✕");
+      document.getElementById("flip-card").appendChild(badge);
+    }
+    UI.updateClassroomControls();
+  },
+
+  renderClassroomCardStatus(status){
+    const st = Classroom.state;
+    st.markedStatus = status;
+    const old = document.querySelector(".card-status");
+    if (old) old.remove();
+    const badge = el("div", "card-status " + (status === "mastered" ? "mastered" : "weak"), status === "mastered" ? "已掌握 ✓" : "存疑 ✕");
+    document.getElementById("flip-card").appendChild(badge);
+    UI.updateClassroomControls();
+  },
+
+  updateClassroomControls(){
+    const st = Classroom.state;
+    const last = st.queue.length - 1;
+    document.querySelectorAll('[data-action="next-word"]').forEach(b => b.disabled = st.currentIndex >= last);
+    document.querySelectorAll('[data-action="prev-word"]').forEach(b => b.disabled = st.currentIndex <= 0);
+    if (st.mode === "quiz") {
+      const cBtn = document.querySelector('[data-action="judge-correct"]');
+      const wBtn = document.querySelector('[data-action="judge-weak"]');
+      if (cBtn) cBtn.disabled = !st.selectedStudentId;
+      if (wBtn) wBtn.disabled = !st.selectedStudentId;
+    } else {
+      const mBtn = document.querySelector('[data-action="mark-mastered"]');
+      const wBtn2 = document.querySelector('[data-action="mark-weak"]');
+      if (mBtn) mBtn.disabled = !!st.markedStatus;
+      if (wBtn2) wBtn2.disabled = !!st.markedStatus;
+    }
+  },
+
+  // 抽人转盘动画
+  renderQuizWheel(student){
+    const st = Classroom.state;
+    const wheel = document.getElementById("quiz-wheel");
+    const pick = document.getElementById("quiz-pick");
+    const card = document.getElementById("flip-card");
+    UI.wheelRunning = true;
+    st.transitioning = true;
+    pick.classList.add("hidden");
+    wheel.classList.remove("hidden");
+    card.classList.add("hidden");
+    wheel.classList.remove("rolling");
+    void wheel.offsetWidth; // 重启动画
+    wheel.classList.add("rolling");
+    wheel.textContent = "?";
+    setTimeout(() => {
+      UI.wheelRunning = false;
+      if (!st.active) return;
+      st.transitioning = false;
+      wheel.classList.add("hidden");
+      card.classList.remove("hidden");
+      pick.classList.remove("hidden");
+      pick.innerHTML = "";
+      const name = el("div", "", student.name);
+      const sub = el("div", "sub", "已被抽中 " + student.callCount + " 次");
+      pick.append(name, sub);
+      UI.updateClassroomControls();
+    }, 1250);
+  },
+
+  renderQuizPickResult(name){
+    const pick = document.getElementById("quiz-pick");
+    if (!name) pick.classList.add("hidden");
+  },
+
+  // ---- 模态 ----
+  openPackModal(id){
+    App.editingPackId = id || null;
+    document.getElementById("pack-modal-title").textContent = id ? "编辑词包" : "新建词包";
+    const p = id ? WordBank.get(id) : null;
+    document.getElementById("pack-input-name").value = p ? p.name : "";
+    document.getElementById("pack-input-desc").value = p ? p.description : "";
+    UI.openModal("modal-pack");
+    document.getElementById("pack-input-name").focus();
+  },
+  openWordModal(packId, wordId){
+    App.editingPackId = packId;
+    App.editingWordId = wordId || null;
+    document.getElementById("word-modal-title").textContent = wordId ? "编辑单词" : "添加单词";
+    const p = WordBank.get(packId);
+    const w = wordId && p ? p.words.find(x => x.id === wordId) : null;
+    document.getElementById("w-word").value = w ? w.word : "";
+    document.getElementById("w-phonetic").value = w ? w.phonetic : "";
+    document.getElementById("w-meaning").value = w ? w.meaning : "";
+    document.getElementById("w-example").value = w ? w.example : "";
+    UI.openModal("modal-word");
+    document.getElementById("w-word").focus();
+  },
+  openStudentModal(id){
+    App.editingStudentId = id || null;
+    document.getElementById("student-modal-title").textContent = id ? "编辑学生" : "添加学生";
+    const s = id ? Students.get(id) : null;
+    document.getElementById("s-name").value = s ? s.name : "";
+    UI.openModal("modal-student");
+    document.getElementById("s-name").focus();
+  },
+  openImportModal(target){
+    App.importTarget = target;
+    document.getElementById("import-file").value = "";
+    const result = document.getElementById("import-result");
+    result.classList.add("hidden");
+    result.textContent = "";
+    const title = document.getElementById("import-modal-title");
+    const hint = document.getElementById("import-format-hint");
+    if (target === "words") {
+      const p = WordBank.get(App.packId);
+      title.textContent = "批量导入单词 → " + (p ? p.name : "");
+      hint.textContent = "TXT（每行一个单词，竖线分隔）\napple | /ˈæpəl/ | 苹果 | I eat an apple.\n\nCSV（首行为表头）\nword,phonetic,meaning,example\napple,/ˈæpəl/,苹果,I eat an apple.\n\nJSON（数组）\n[ { \"word\": \"apple\", \"meaning\": \"苹果\" } ]";
+    } else if (target === "students") {
+      title.textContent = "批量导入学生";
+      hint.textContent = "每行一个姓名，或 CSV：\n\nname\n小明\n小红\n\nJSON：\n[\"小明\", \"小红\"] 或 [{\"name\": \"小明\"}]";
+    } else {
+      title.textContent = "导入 JSON 备份恢复数据";
+      hint.textContent = "选择由本应用「导出 JSON 备份」生成的文件。导入后将覆盖当前全部数据。";
+    }
+    UI.openModal("modal-import");
+  },
+  showImportResult(info){
+    const box = document.getElementById("import-result");
+    box.classList.remove("hidden");
+    const lines = [
+      '<span class="ok">成功导入 ' + info.success + ' 条</span>',
+      "总数 " + info.total + " 条 · 跳过 " + info.skipped + " 条"
+    ];
+    if (info.note) lines.push(info.note);
+    (info.skippedReasons || []).forEach(r => lines.push('<span class="skip">' + r + "</span>"));
+    box.innerHTML = lines.join("<br>");
+  },
+  showImportError(msg){
+    UI.toast(msg, "err");
+  },
+
+  // ---- 确认 ----
+  confirm(title, text, onOk, okLabel){
+    document.getElementById("confirm-title").textContent = title;
+    document.getElementById("confirm-text").textContent = text;
+    document.getElementById("confirm-ok").textContent = okLabel || "确认";
+    App.confirmCb = onOk;
+    UI.openModal("modal-confirm");
+  }
+};
+
+/* ============================================================
+ * App —— 动作分发 / 初始化
+ * ==========================================================*/
+const App = {
+  currentView: "home",
+  packId: null,
+  editingPackId: null,
+  editingWordId: null,
+  editingStudentId: null,
+  importTarget: null,
+  confirmCb: null,
+  actions: {
+    "go-home": () => UI.showView("home"),
+    "go-setup": () => UI.showView("setup"),
+    "go-packs": () => UI.showView("packs"),
+    "go-students": () => UI.showView("students"),
+    "go-weak": () => UI.showView("weak"),
+    "go-backup": () => UI.showView("backup"),
+    "go-settings": () => UI.showView("settings"),
+    "open-pack": (t) => UI.showView("pack", t.dataset.packId),
+    "start-class": () => App.startClass(),
+    "toggle-fullscreen": () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    },
+    "exit-class": () => Classroom.exit(),
+    "prev-word": () => Classroom.prev(),
+    "next-word": () => Classroom.next(),
+    "flip-word": () => Classroom.flip(),
+    "mark-mastered": () => Classroom.markMastered(),
+    "mark-weak": () => Classroom.markWeak(),
+    "pick-student": () => Classroom.pickStudent(),
+    "judge-correct": () => Classroom.judge("correct"),
+    "judge-weak": () => Classroom.judge("weak"),
+    "create-pack": () => UI.openPackModal(),
+    "edit-pack": () => UI.openPackModal(App.packId),
+    "edit-pack-row": (t) => UI.openPackModal(t.dataset.packId),
+    "del-pack-row": (t) => App.confirmDeletePack(t.dataset.packId),
+    "save-pack": () => App.savePack(),
+    "close-pack": () => UI.closeModal("modal-pack"),
+    "add-word": () => UI.openWordModal(App.packId),
+    "edit-word-row": (t) => UI.openWordModal(App.packId, t.dataset.wordId),
+    "del-word-row": (t) => App.confirmDeleteWord(t.dataset.wordId),
+    "save-word": () => App.saveWord(),
+    "close-word": () => UI.closeModal("modal-word"),
+    "add-student": () => UI.openStudentModal(),
+    "edit-student-row": (t) => UI.openStudentModal(t.dataset.studentId),
+    "del-student-row": (t) => App.confirmDeleteStudent(t.dataset.studentId),
+    "toggle-student": (t) => { Students.toggle(t.dataset.studentId); UI.renderStudents(); },
+    "save-student": () => App.saveStudent(),
+    "close-student": () => UI.closeModal("modal-student"),
+    "export-json": () => App.exportJSON(),
+    "import-json": () => UI.openImportModal("backup"),
+    "restore-demo": () => App.restoreDemo(),
+    "clear-all": () => App.clearAll(),
+    "close-import": () => UI.closeModal("modal-import"),
+    "clear-demo": () => App.clearDemo(),
+    "confirm-cancel": () => UI.closeModal("modal-confirm"),
+    "confirm-ok": () => {
+      const cb = App.confirmCb;
+      App.confirmCb = null;
+      UI.closeModal("modal-confirm");
+      if (cb) cb();
+    },
+    "weak-open": (t) => UI.showView("pack", t.dataset.packId),
+    "weak-del": (t) => {
+      WeakBook.remove(t.dataset.packId, t.dataset.wordId);
+      UI.renderWeak();
+      UI.toast("已移除该薄弱词", "ok");
+    }
+  },
+
+  startClass(){
+    const pack = WordBank.get(Setup.packId);
+    if (!pack) { UI.toast("请先选择词包", "err"); return; }
+    if (!pack.words.length) { UI.toast("该词包还没有单词，请先添加或导入", "err"); return; }
+    if (Setup.mode === "quiz" && !Students.enabledList().length) { UI.toast("抢答模式需要至少一名可用学生", "err"); return; }
+    Classroom.start({ pack: pack, mode: Setup.mode, direction: Setup.direction, shuffled: Setup.order === "shuffle" });
+  },
+
+  startWeakReview(){
+    const queue = WordBank.weakQueue();
+    if (!queue.length) { UI.toast("当前没有薄弱词", "err"); return; }
+    Classroom.start({ mode: "browse", direction: Setup.direction, shuffled: true, isReview: true, items: queue });
+  },
+
+  savePack(){
+    const name = document.getElementById("pack-input-name").value;
+    const desc = document.getElementById("pack-input-desc").value;
+    if (!name.trim()) { UI.toast("请输入词包名称", "err"); return; }
+    if (App.editingPackId) WordBank.update(App.editingPackId, name, desc);
+    else WordBank.create(name, desc);
+    UI.closeModal("modal-pack");
+    UI.renderPacks();
+  },
+
+  saveWord(){
+    const f = {
+      word: document.getElementById("w-word").value,
+      phonetic: document.getElementById("w-phonetic").value,
+      meaning: document.getElementById("w-meaning").value,
+      example: document.getElementById("w-example").value
+    };
+    if (!f.word.trim()) { UI.toast("请输入英文单词", "err"); return; }
+    if (!f.meaning.trim()) { UI.toast("请输入中文释义", "err"); return; }
+    if (App.editingWordId) WordBank.updateWord(App.editingPackId, App.editingWordId, f);
+    else WordBank.addWord(App.editingPackId, f);
+    UI.closeModal("modal-word");
+    UI.renderPackDetail(App.editingPackId);
+  },
+
+  saveStudent(){
+    const name = document.getElementById("s-name").value;
+    if (!name.trim()) { UI.toast("请输入学生姓名", "err"); return; }
+    if (App.editingStudentId) Students.update(App.editingStudentId, name, Students.get(App.editingStudentId).enabled);
+    else Students.add(name, true);
+    UI.closeModal("modal-student");
+    UI.renderStudents();
+  },
+
+  confirmDeletePack(id){
+    const p = WordBank.get(id);
+    if (!p) return;
+    UI.confirm("删除词包", "确定删除词包「" + p.name + "」吗？\n其 " + p.words.length + " 个单词及相关薄弱词记录将一并删除。", () => {
+      WordBank.remove(id);
+      UI.renderPacks();
+      UI.toast("已删除词包", "ok");
+    }, "删除");
+  },
+  confirmDeleteWord(wordId){
+    const p = WordBank.get(App.packId);
+    const w = p && p.words.find(x => x.id === wordId);
+    if (!w) return;
+    UI.confirm("删除单词", "确定删除单词「" + w.word + "」吗？", () => {
+      WordBank.removeWord(App.packId, wordId);
+      UI.renderPackDetail(App.packId);
+      UI.toast("已删除单词", "ok");
+    }, "删除");
+  },
+  confirmDeleteStudent(id){
+    const s = Students.get(id);
+    if (!s) return;
+    UI.confirm("删除学生", "确定删除学生「" + s.name + "」吗？", () => {
+      Students.remove(id);
+      UI.renderStudents();
+      UI.toast("已删除学生", "ok");
+    }, "删除");
+  },
+
+  exportJSON(){
+    const name = "speedword_backup_" + Utils.formatDate(Utils.now()) + ".json";
+    Utils.fileDownload(name, Store.exportJSON());
+    UI.toast("已导出备份文件", "ok");
+  },
+  restoreDemo(){
+    UI.confirm("恢复演示数据", "将清空当前全部数据，并恢复内置演示词库与学生名单。", () => {
+      seedDemo();
+      UI.closeModal("modal-confirm");
+      UI.showView("home");
+      UI.toast("已恢复演示数据", "ok");
+    }, "恢复");
+  },
+  clearAll(){
+    UI.confirm("清空全部数据", "将删除本机保存的所有词库、学生名单与错题本。\n此操作不可撤销，请确认。", () => {
+      Store.clearAll();
+      UI.showView("home");
+      UI.toast("已清空全部数据", "ok");
+    }, "清空");
+  },
+  clearDemo(){
+    Store.clearAll();
+    UI.closeModal("firstrun");
+    UI.toast("已清空演示数据，可前往「词库管理」创建自己的词包", "ok");
+    UI.showView("home");
+  },
+
+  // ---- 导入处理 ----
+  handleWordImport(file, text){
+    const parsed = Importer.parseByExt(file.name, text);
+    if (parsed.fatal) { UI.showImportError(parsed.fatal); return; }
+    const added = WordBank.mergeImport(App.packId, parsed.items);
+    const duplicates = parsed.items.length - added;
+    UI.showImportResult({
+      total: parsed.items.length + parsed.skipped.length,
+      success: added,
+      skipped: parsed.skipped.length,
+      note: duplicates > 0 ? "其中 " + duplicates + " 条因重复被跳过" : "",
+      skippedReasons: parsed.skipped.slice(0, 8).map(s => "第 " + s.line + " 行：" + s.reason)
+    });
+    UI.renderPackDetail(App.packId);
+  },
+  handleStudentImport(file, text){
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    let names = [];
+    if (ext === "json") {
+      try {
+        const d = JSON.parse(text);
+        if (!Array.isArray(d)) { UI.showImportError("学生 JSON 应为数组，例如 [\"小明\"]"); return; }
+        d.forEach(x => { if (typeof x === "string") names.push(x); else if (x && x.name) names.push(String(x.name)); });
+      } catch (e) { UI.showImportError("学生 JSON 格式不正确"); return; }
+    } else {
+      names = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (names[0] && names[0].toLowerCase() === "name") names.shift();
+    }
+    const added = Students.importNames(names);
+    UI.showImportResult({
+      total: names.length,
+      success: added,
+      skipped: names.length - added,
+      note: "",
+      skippedReasons: []
+    });
+    UI.renderStudents();
+  },
+  handleBackupImport(text){
+    const res = Store.importBackup(text);
+    if (res.ok) {
+      UI.closeModal("modal-import");
+      UI.showView("home");
+      UI.toast("数据已恢复 ✓", "ok");
+    } else {
+      UI.showImportError(res.error);
+    }
+  }
+};
+
+/* ============================================================
+ * 初始化与事件绑定
+ * ==========================================================*/
+function wireEvents(){
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest(".seg-btn, [data-action]");
+    if (!t) return;
+    if (t.classList.contains("seg-btn")) {
+      if (t.dataset.mode) Setup.mode = t.dataset.mode;
+      else if (t.dataset.order) Setup.order = t.dataset.order;
+      else if (t.dataset.direction) Setup.direction = t.dataset.direction;
+      t.parentElement.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+      t.classList.add("active");
+      return;
+    }
+    const act = t.dataset.action;
+    // 课堂进行中：忽略键盘触发的按钮点击，避免与快捷键重复
+    if (e.detail === 0 && Classroom.state.active) return;
+    if (App.actions[act]) App.actions[act](t, e);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (UI.isModalOpen()) {
+      if (e.key === "Escape" && UI.modalStack[UI.modalStack.length - 1] !== "firstrun") {
+        UI.closeTopModal();
+        e.preventDefault();
+      }
+      return;
+    }
+    const st = Classroom.state;
+    if (!st.active) return;
+    if (e.code === "Space") { e.preventDefault(); Classroom.flip(); }
+    else if (e.key === "Enter") { e.preventDefault(); Classroom.next(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); Classroom.prev(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); Classroom.next(); }
+    else if (e.key === "g" || e.key === "G") { e.preventDefault(); if (st.mode === "quiz") Classroom.judge("correct"); else Classroom.markMastered(); }
+    else if (e.key === "r" || e.key === "R") { e.preventDefault(); if (st.mode === "quiz") Classroom.judge("weak"); else Classroom.markWeak(); }
+    else if (e.key === "s" || e.key === "S") { e.preventDefault(); if (st.mode === "quiz") Classroom.pickStudent(); }
+    else if (e.key === "Escape") { e.preventDefault(); Classroom.exit(); }
+  });
+
+  document.getElementById("flip-card").addEventListener("click", () => Classroom.flip());
+
+  document.getElementById("setup-pack").addEventListener("change", (e) => { Setup.packId = e.target.value; });
+
+  document.getElementById("import-drop").addEventListener("click", () => document.getElementById("import-file").click());
+  document.getElementById("import-file").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    readFileAsText(file, (text) => {
+      const target = App.importTarget;
+      if (target === "words") App.handleWordImport(file, text);
+      else if (target === "students") App.handleStudentImport(file, text);
+      else App.handleBackupImport(text);
+    });
+  });
+
+  document.getElementById("setting-sound").addEventListener("change", (e) => {
+    Store.data.settings.soundEnabled = e.target.checked;
+    Store.save();
+    UI.renderHome();
+    if (e.target.checked) Sound.correct();
+  });
+  document.getElementById("setting-autonext").addEventListener("change", (e) => {
+    Store.data.settings.autoNext = e.target.checked;
+    Store.save();
+  });
+
+  document.getElementById("weak-review-btn").addEventListener("click", () => App.startWeakReview());
+}
+
+function init(){
+  const had = Store.load();
+  if (!had) {
+    seedDemo();
+  }
+  UI.renderHome();
+  UI.renderSettings();
+  wireEvents();
+  UI.showView("home");
+  if (!had) {
+    UI.openModal("firstrun");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", init);
+
+// 调试/自动化测试句柄（不影响课堂使用）
+window.__SW = { Utils, Store, WordBank, WeakBook, Students, Importer, Sound, Setup, Classroom, UI, App, seedDemo };
+})();
+</script>
+</body>
+</html>
