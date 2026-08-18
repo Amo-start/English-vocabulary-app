@@ -175,6 +175,65 @@ button{font-family:inherit;}
   border-radius:999px;padding:3px 16px;
   font-size:18px;color:var(--text-dim);font-weight:600;z-index:2;
 }
+/* 图片侦探：emoji / 图片作为正面线索 */
+.card-emoji{font-size:clamp(120px,24vh,240px);line-height:1;}
+.card-image{max-width:82%;max-height:64%;object-fit:contain;border-radius:18px;filter:drop-shadow(0 14px 40px rgba(0,0,0,.5));}
+/* 发音挑战：再听一遍按钮 */
+.btn-listen{
+  min-height:96px;padding:0 40px;font-size:30px;font-weight:800;
+  background:linear-gradient(135deg,#ffb84d,#ff8a00);color:#2a1500;border:none;
+  border-radius:18px;box-shadow:0 10px 30px rgba(255,184,77,.3);
+}
+.btn-listen:active{transform:scale(.96);}
+/* 小组对抗：积分榜 */
+.group-scoreboard{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--line);border-radius:999px;
+  padding:6px 16px;
+}
+.group-score{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card-2);border:1px solid var(--line);border-radius:999px;
+  padding:4px 14px;font-size:18px;font-weight:800;white-space:nowrap;
+}
+.group-score.lead{background:linear-gradient(90deg,#ff6a00,#ffb84d);color:#1a0a00;border-color:#ffb84d;}
+.group-score .pts{color:var(--text-dim);font-weight:700;}
+.group-score.lead .pts{color:#1a0a00;}
+/* 复习池：玩法选择器 */
+.weak-modes{
+  display:flex;align-items:center;gap:12px;padding:14px 26px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;
+}
+.weak-modes-label{font-size:18px;color:var(--text-dim);font-weight:600;white-space:nowrap;}
+.weak-modes .seg-btn{min-height:56px;font-size:18px;min-width:0;flex:0 1 auto;padding:0 16px;}
+.weak-lastmode{color:var(--text-dim);font-size:15px;}
+.weak-replay{color:var(--amber);}
+
+/* 粘贴导入 */
+.paste-box{display:flex;flex-direction:column;gap:10px;border-top:1px dashed var(--line);padding-top:14px;margin-top:14px;}
+.paste-box label{color:var(--text-dim);font-size:16px;line-height:1.5;}
+.paste-box textarea{width:100%;min-height:150px;padding:14px;font-size:18px;line-height:1.6;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);resize:vertical;}
+
+/* 课堂内切词包下拉 */
+.cr-pack-select{padding:8px 12px;font-size:16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);max-width:220px;min-height:44px;}
+
+/* 内容编辑器：图片/表情预览 */
+.w-image-preview{margin-top:8px;font-size:clamp(36px,6vh,64px);line-height:1;text-align:center;}
+
+/* 节奏区扩展条：小组积分榜 + 集体目标 */
+.classroom-extra{
+  display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+  padding:8px 24px;border-bottom:1px solid var(--line);flex-shrink:0;
+}
+.cr-goal{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:var(--text-dim);}
+.cr-goal-bar{
+  width:min(220px,30vw);height:14px;border-radius:999px;background:var(--card-2);
+  border:1px solid var(--line);overflow:hidden;
+}
+.cr-goal-fill{
+  height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,#4db2ff,#3ddc84);transition:width .4s ease;
+}
+.cr-goal-fill.done{background:linear-gradient(90deg,#ffb84d,#ff6a00);}
 
 /* 抢答转盘 */
 .quiz-wheel{
@@ -361,6 +420,19 @@ button{font-family:inherit;}
         <div class="seg" id="setup-mode">
           <button class="seg-btn active" data-mode="flash-recall">闪记挑战</button>
           <button class="seg-btn" data-mode="rapid-response">抢答风暴</button>
+          <button class="seg-btn" data-mode="picture-hunt">图片侦探</button>
+          <button class="seg-btn" data-mode="word-bridge">词语搭桥</button>
+          <button class="seg-btn" data-mode="pronunciation">发音挑战</button>
+          <button class="seg-btn" data-mode="group">小组对抗</button>
+        </div>
+      </div>
+      <div class="field hidden" id="setup-group-field">
+        <label>小组数量</label>
+        <div class="seg" id="setup-group-count">
+          <button class="seg-btn" data-groupcount="2">2 组</button>
+          <button class="seg-btn active" data-groupcount="3">3 组</button>
+          <button class="seg-btn" data-groupcount="4">4 组</button>
+          <button class="seg-btn" data-groupcount="5">5 组</button>
         </div>
       </div>
       <div class="field">
@@ -375,6 +447,7 @@ button{font-family:inherit;}
         <div class="seg" id="setup-direction">
           <button class="seg-btn active" data-direction="word-to-meaning">英文 → 中文</button>
           <button class="seg-btn" data-direction="meaning-to-word">中文 → 英文</button>
+          <button class="seg-btn" data-direction="mixed">中英混合（随机）</button>
         </div>
       </div>
       <button class="btn btn-primary" data-action="start-class">开始课堂</button>
@@ -394,10 +467,20 @@ button{font-family:inherit;}
         <div><span id="cr-streak" class="cr-streak hidden"></span></div>
         <span class="cr-timer" id="cr-timer"></span>
         <div class="cr-actions">
+          <select id="cr-pack-select" class="cr-pack-select" title="切换词包（不退出课堂）"></select>
+          <button class="btn btn-ghost btn-sm" data-action="temp-word">➕ 临时词条</button>
           <button class="btn btn-ghost btn-sm" data-action="toggle-fullscreen">⛶ 全屏</button>
           <button class="btn btn-ghost btn-sm" data-action="exit-class">退出 Esc</button>
         </div>
       </header>
+      <!-- 节奏区扩展：小组积分榜 / 集体目标 -->
+      <div class="classroom-extra" id="cr-extra">
+        <div id="cr-group-board" class="group-scoreboard hidden"></div>
+        <div id="cr-goal" class="cr-goal hidden">
+          <span id="cr-goal-text">🎯 集体目标 0/20</span>
+          <div class="cr-goal-bar"><div class="cr-goal-fill" id="cr-goal-fill"></div></div>
+        </div>
+      </div>
 
       <!-- 题目区 -->
       <div class="stage" id="stage">
@@ -424,6 +507,7 @@ button{font-family:inherit;}
       <div class="cr-controls" id="cr-controls">
         <div id="cr-flash-controls" class="cr-controls-group">
           <button class="btn btn-ghost" data-action="prev-word">← 上一题</button>
+          <button class="btn btn-ghost hidden" id="btn-listen" data-action="listen">🔊 再听一遍</button>
           <button class="btn btn-ghost" data-action="advance" id="btn-advance">揭晓答案</button>
           <button class="btn btn-primary" data-action="next-word">下一题 →</button>
         </div>
@@ -461,6 +545,7 @@ button{font-family:inherit;}
       <button class="btn btn-ghost" data-action="go-packs">← 词库管理</button>
       <h1 id="pack-detail-name"></h1>
       <button class="btn btn-ghost" data-action="import-words">批量导入</button>
+      <button class="btn btn-ghost" data-action="paste-import">📋 粘贴导入</button>
       <button class="btn btn-ghost" data-action="edit-pack">编辑词包</button>
       <button class="btn btn-primary" data-action="add-word">+ 添加内容</button>
     </header>
@@ -485,6 +570,15 @@ button{font-family:inherit;}
       <h1>复习池</h1>
       <button class="btn btn-primary" id="weak-review-btn">开始复习</button>
     </header>
+    <div class="weak-modes" id="weak-modes">
+      <span class="weak-modes-label">复习玩法：</span>
+      <div class="seg" id="weak-mode-seg">
+        <button class="seg-btn active" data-weakmode="flash-recall">闪记挑战</button>
+        <button class="seg-btn" data-weakmode="picture-hunt">图片侦探</button>
+        <button class="seg-btn" data-weakmode="word-bridge">词语搭桥</button>
+        <button class="seg-btn" data-weakmode="pronunciation">发音挑战</button>
+      </div>
+    </div>
     <div class="weak-empty hidden" id="weak-empty">
       <div class="empty-emoji">🎉</div>
       <div>太棒了！当前没有待复习内容。</div>
@@ -538,6 +632,14 @@ button{font-family:inherit;}
         <label class="switch"><input type="checkbox" id="setting-autonext"><span class="slider"></span></label>
       </div>
       <div class="setting-row">
+        <div><div class="setting-name">阶梯难度</div><div class="setting-desc">一轮结束后自动升级玩法：闪记(英→中) → 闪记(中→英) → 图片侦探 → 发音 → 词语搭桥 → 混合</div></div>
+        <label class="switch"><input type="checkbox" id="setting-ladder"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-name">集体目标（题数）</div><div class="setting-desc">每节课全班累计答对多少题达成目标（0 = 关闭）</div></div>
+        <label><input type="number" id="setting-goal" min="0" max="200" step="5" style="width:96px;padding:10px;font-size:18px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);"></label>
+      </div>
+      <div class="setting-row">
         <div><div class="setting-name">关于</div><div class="setting-desc">极速识词 · 课堂互动版 · V3.0 · 单 HTML 离线可用</div></div>
       </div>
     </div>
@@ -573,6 +675,11 @@ button{font-family:inherit;}
     <div class="field"><label>音标</label><input type="text" id="w-phonetic" placeholder="/ˈæpəl/"></div>
     <div class="field"><label>中文释义 *</label><input type="text" id="w-meaning" placeholder="苹果"></div>
     <div class="field"><label>例句</label><textarea id="w-example" placeholder="I eat an apple every day."></textarea></div>
+    <div class="field">
+      <label>图片 / 表情（可选，图片侦探用）</label>
+      <input type="text" id="w-image" placeholder="输入 emoji 或粘贴图片地址 / dataURL">
+      <div class="w-image-preview hidden" id="w-image-preview"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="close-word">取消</button>
       <button class="btn btn-primary" data-action="save-word">保存</button>
@@ -599,9 +706,27 @@ button{font-family:inherit;}
     <div class="import-format" id="import-format-hint"></div>
     <div class="import-drop" id="import-drop">点击选择文件（TXT / CSV / JSON）</div>
     <input type="file" id="import-file" accept=".txt,.csv,.json" class="hidden">
+    <div class="paste-box hidden" id="paste-box">
+      <label>从 Excel / 网页复制后直接粘贴：每行一条，Tab 或空格分隔「内容 / 释义 / 例句」</label>
+      <textarea id="paste-text" placeholder="apple	苹果	I eat an apple.&#10;book	书	This is a book." rows="6"></textarea>
+      <button class="btn btn-primary" data-action="paste-import-run">📋 粘贴解析导入</button>
+    </div>
     <div class="import-result hidden" id="import-result"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="close-import">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 模态：临时词条（课堂内快捷添加） ======== -->
+<div class="modal-backdrop hidden" id="modal-tempword">
+  <div class="modal">
+    <h2>临时词条（加入当前词包）</h2>
+    <div class="field"><label>英文内容 *</label><input type="text" id="tw-content" placeholder="blackboard"></div>
+    <div class="field"><label>中文释义 *</label><input type="text" id="tw-meaning" placeholder="黑板"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-tempword">取消</button>
+      <button class="btn btn-primary" data-action="save-tempword">添加并继续课堂</button>
     </div>
   </div>
 </div>
@@ -672,7 +797,31 @@ const Utils = {
   typeLabel(type){
     const map = { word: "单词", phrase: "词组", sentence: "句子" };
     return map[type] || "单词";
-  }
+  },
+  modeLabel(mode){
+    const map = {
+      "flash-recall": "闪记挑战", "rapid-response": "抢答风暴",
+      "picture-hunt": "图片侦探", "word-bridge": "词语搭桥",
+      "pronunciation": "发音挑战", "group": "小组对抗"
+    };
+    return map[mode] || "课堂";
+  },
+  // 玩法轮换：给定当前玩法，返回下一个不同玩法（用于复习池"换一种方式再练"与阶梯难度）
+  // 排除需要学生名单的 rapid-response / group
+  nextMode(mode){
+    const cycle = ["flash-recall", "picture-hunt", "word-bridge", "pronunciation"];
+    const i = cycle.indexOf(mode);
+    return cycle[(i + 1) % cycle.length];
+  },
+  // 阶梯难度序列（设置开启后，一轮结束自动升档）
+  LADDER: [
+    { mode: "flash-recall", direction: "word-to-meaning", label: "L1 闪记 · 英→中" },
+    { mode: "flash-recall", direction: "meaning-to-word", label: "L2 闪记 · 中→英" },
+    { mode: "picture-hunt", direction: "word-to-meaning", label: "L3 图片侦探" },
+    { mode: "pronunciation", direction: "word-to-meaning", label: "L4 发音挑战" },
+    { mode: "word-bridge", direction: "word-to-meaning", label: "L5 词语搭桥" },
+    { mode: "flash-recall", direction: "mixed", label: "L6 混合复习" }
+  ]
 };
 
 /* ============================================================
@@ -686,10 +835,13 @@ function defaultAppData(){
     settings: {
       theme: "dark",
       soundEnabled: true,
-      autoNext: false
+      autoNext: false,
+      collectiveGoal: 20,   // 集体目标：每节课累计答对数
+      difficultyLadder: false // 阶梯难度：一轮结束自动升档
     },
     packs: [],
     students: [],
+    groups: [],            // 小组定义（课堂对抗）
     sessions: [],
     reviewPool: [],
     media: { images: {}, audio: {} },
@@ -809,10 +961,13 @@ function migrate(raw){
   const data = Object.assign(base, raw);
   if (!Array.isArray(data.packs)) data.packs = [];
   if (!Array.isArray(data.students)) data.students = [];
+  if (!Array.isArray(data.groups)) data.groups = [];
   if (!Array.isArray(data.sessions)) data.sessions = [];
   if (!Array.isArray(data.reviewPool)) data.reviewPool = [];
   if (!data.media) data.media = { images: {}, audio: {} };
   if (!data.settings) data.settings = base.settings;
+  if (typeof data.settings.collectiveGoal !== "number") data.settings.collectiveGoal = 20;
+  if (typeof data.settings.difficultyLadder !== "boolean") data.settings.difficultyLadder = false;
   if (!data.statistics) data.statistics = base.statistics;
   data.version = 3;
   // 清理旧字段残余
@@ -921,6 +1076,7 @@ const ItemBank = {
       phonetic: (f.phonetic || "").trim(),
       meaning: f.meaning.trim(),
       example: (f.example || "").trim(),
+      image: (f.image || "").trim(),
       tags: f.tags || [],
       difficulty: f.difficulty || 2,
       createdAt: now,
@@ -941,6 +1097,7 @@ const ItemBank = {
     if (f.phonetic != null) item.phonetic = f.phonetic.trim();
     if (f.meaning != null) item.meaning = f.meaning.trim();
     if (f.example != null) item.example = f.example.trim();
+    if (f.image != null) item.image = f.image.trim();
     if (f.tags != null) item.tags = f.tags;
     if (f.difficulty != null) item.difficulty = f.difficulty;
     item.updatedAt = Utils.now();
@@ -973,6 +1130,7 @@ const ItemBank = {
         phonetic: it.phonetic || "",
         meaning: it.meaning || "",
         example: it.example || "",
+        image: it.image || "",
         tags: [],
         difficulty: 2,
         createdAt: now,
@@ -991,21 +1149,29 @@ const ItemBank = {
  * ==========================================================*/
 const ReviewPool = {
   all(){ return Store.data.reviewPool; },
-  add(itemId, packId, reason){
+  add(itemId, packId, reason, mode){
     let entry = Store.data.reviewPool.find(r => r.itemId === itemId && r.packId === packId);
     if (entry) {
       if (!entry.reasons.includes(reason)) entry.reasons.push(reason);
       entry.count++;
       entry.lastSeenAt = Utils.now();
+      if (mode) entry.lastMode = mode;
     } else {
       Store.data.reviewPool.push({
         itemId, packId,
         reasons: [reason],
         count: 1,
         lastSeenAt: Utils.now(),
-        addedAt: Utils.now()
+        addedAt: Utils.now(),
+        lastMode: mode || ""
       });
     }
+    Store.save();
+  },
+  // 记录"最近用哪种玩法练习过"（复习池换玩法闭环用）
+  markMode(itemId, packId, mode){
+    const entry = Store.data.reviewPool.find(r => r.itemId === itemId && r.packId === packId);
+    if (entry && mode) entry.lastMode = mode;
     Store.save();
   },
   remove(itemId, packId){
@@ -1246,6 +1412,125 @@ const Importer = {
     if (t.startsWith("[") || t.startsWith("{")) return Importer.parseJSON(text);
     if (t.includes(",") && !t.includes("|")) return Importer.parseCSV(text);
     return Importer.parseTXT(text);
+  },
+  // 粘贴表格导入：Tab 或 ≥2 空格分隔列（内容/释义/例句），教师无需理解 CSV（文档 12.2）
+  parsePasted(text){
+    const items = [], skipped = [];
+    const lines = text.split(/\r?\n/);
+    lines.forEach((raw, idx) => {
+      const line = raw.trim();
+      if (!line) return;
+      let parts = line.split("\t").map(s => s.trim());
+      if (parts.length < 2) parts = line.split(/\s{2,}/).map(s => s.trim());
+      const content = parts[0] || "";
+      const meaning = parts[1] || "";
+      const example = parts[2] || "";
+      if (!content) { skipped.push({ line: idx + 1, reason: "缺少内容" }); return; }
+      if (!meaning) { skipped.push({ line: idx + 1, reason: "缺少中文释义" }); return; }
+      items.push({ content, meaning, example, phonetic: "", type: "word" });
+    });
+    return { items, skipped };
+  }
+};
+
+/* ============================================================
+ * Media —— 图片 / 表情 视觉线索（图片侦探等玩法）
+ *   优先教师图片（item.image: dataURL/URL）→ 内置 emoji 字典 → 首字母回退
+ * ==========================================================*/
+const Media = {
+  dict: {
+    apple: "🍎", book: "📖", teacher: "👩‍🏫", student: "🧑‍🎓", classroom: "🏫",
+    friend: "🤝", happy: "😊", beautiful: "🌸", school: "🏫", morning: "🌅",
+    "take care": "🙏", "how are you?": "💬",
+    cat: "🐱", dog: "🐶", bird: "🐦", fish: "🐟", flower: "🌷", tree: "🌳",
+    sun: "☀️", moon: "🌙", star: "⭐", rain: "🌧️", snow: "❄️", water: "💧",
+    food: "🍔", fruit: "🍎", milk: "🥛", egg: "🥚", bread: "🍞", rice: "🍚",
+    house: "🏠", car: "🚗", bus: "🚌", bike: "🚲", train: "🚆", plane: "✈️",
+    run: "🏃", walk: "🚶", eat: "🍽️", drink: "🥤", sleep: "😴", read: "📖",
+    write: "✍️", sing: "🎤", dance: "💃", play: "⚽", swim: "🏊",
+    family: "👨‍👩‍👧", father: "👨", mother: "👩", brother: "👦", sister: "👧", baby: "👶",
+    red: "🔴", blue: "🔵", green: "🟢", yellow: "🟡", white: "⚪", black: "⚫",
+    one: "1️⃣", two: "2️⃣", three: "3️⃣", four: "4️⃣", five: "5️⃣",
+    girl: "👧", boy: "👦", man: "👨", woman: "👩", child: "🧒",
+    time: "⏰", clock: "🕐", money: "💰", gift: "🎁", heart: "❤️", music: "🎵",
+    weather: "🌤️", spring: "🌸", summer: "☀️", autumn: "🍂", winter: "❄️",
+    breakfast: "🥞", lunch: "🍱", dinner: "🍲", tea: "🍵", coffee: "☕",
+    pencil: "✏️", ruler: "📏", bag: "🎒", door: "🚪", window: "🪟", desk: "🪑",
+    "happy new year": "🎊", "good morning": "🌅", "good night": "🌙", "thank you": "🙏",
+    sorry: "😔", please: "🙏", help: "🆘", welcome: "👋", "good bye": "👋", goodbye: "👋"
+  },
+  // 判断字符串是否为 emoji（教师直接填表情时）
+  isEmoji(s){
+    return !!s && /^[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u.test(s);
+  },
+  emojiFor(item){
+    if (!item) return "❓";
+    const key = String(item.content || "").trim().toLowerCase();
+    if (Media.dict[key]) return Media.dict[key];
+    if (Media.isEmoji(item.image)) return item.image;
+    // 回退：首字母
+    return (key[0] || "?").toUpperCase();
+  },
+  // 返回视觉线索 { kind: "emoji" | "image", value }
+  visual(item){
+    if (!item) return { kind: "emoji", value: "❓" };
+    if (item.image && !Media.isEmoji(item.image) && String(item.image).trim()) {
+      return { kind: "image", value: String(item.image).trim() };
+    }
+    return { kind: "emoji", value: Media.emojiFor(item) };
+  }
+};
+
+/* ============================================================
+ * Groups —— 小组数据（小组对抗玩法）
+ * ==========================================================*/
+const Groups = {
+  all(){ return Store.data.groups; },
+  get(id){ return Store.data.groups.find(g => g.id === id); },
+  clear(){ Store.data.groups = []; Store.save(); },
+  // 将启用学生蛇形均分为 count 组（均衡人数与能力）
+  split(count){
+    const students = Students.enabledList();
+    if (!students.length) { Store.data.groups = []; Store.save(); return []; }
+    const n = Math.max(2, count | 0);
+    const buckets = [];
+    for (let i = 0; i < n; i++) buckets.push([]);
+    students.forEach((s, i) => {
+      const col = Math.floor(i / n) % 2 === 0 ? i % n : n - 1 - (i % n);
+      buckets[col].push(s.id);
+    });
+    Store.data.groups = buckets.map(ids => ({
+      id: Utils.uid("group"),
+      name: "第" + (buckets.indexOf(ids) + 1) + "组",
+      memberIds: ids,
+      score: 0,
+      picked: 0
+    }));
+    Store.save();
+    return Store.data.groups;
+  },
+  addScore(id, delta){
+    const g = Groups.get(id);
+    if (!g) return;
+    g.score += delta || 1;
+    Store.save();
+  },
+  resetScores(){
+    Store.data.groups.forEach(g => { g.score = 0; g.picked = 0; });
+    Store.save();
+  },
+  // 公平抽组：最少得分优先 + 同分随机，避开上组
+  pick(lastGroupId){
+    const groups = Store.data.groups.filter(g => g.memberIds.length);
+    if (!groups.length) return null;
+    const avail = groups.filter(g => g.id !== lastGroupId);
+    const pool = avail.length ? avail : groups;
+    const minScore = Math.min(...pool.map(g => g.score));
+    const fair = pool.filter(g => g.score === minScore);
+    const chosen = fair[Math.floor(Math.random() * fair.length)];
+    chosen.picked++;
+    Store.save();
+    return chosen;
   }
 };
 
@@ -1302,7 +1587,8 @@ const Setup = {
   packId: null,
   mode: "flash-recall",
   order: "shuffle",
-  direction: "word-to-meaning"
+  direction: "word-to-meaning",
+  groupCount: 3
 };
 
 /* ============================================================
@@ -1313,12 +1599,12 @@ const GameEngine = {
   state: {
     active: false,
     phase: 'ready',        // ready | hint | answer | feedback
-    mode: 'flash-recall',  // flash-recall | rapid-response
+    mode: 'flash-recall',  // flash-recall | rapid-response | picture-hunt | word-bridge | pronunciation | group
     direction: 'word-to-meaning',
     shuffled: true,
     isReview: false,
     pack: null,
-    queue: [],             // [{ pack, item }]
+    queue: [],             // [{ pack, item, dir? }]
     currentIndex: 0,
     currentItem: null,
     hintVisible: false,
@@ -1327,10 +1613,16 @@ const GameEngine = {
     timer: 0,
     timerId: null,
     streak: 0,
+    correctTotal: 0,       // 本轮累计答对（集体目标用）
     classSignal: 'unrated',
     sessionId: null,
     lastStudentId: null,
-    selectedStudentId: null
+    selectedStudentId: null,
+    groupCount: 2,
+    lastGroupId: null,
+    selectedGroupId: null,
+    ladder: false,
+    ladderIndex: 0
   },
 
   start(opts){
@@ -1346,11 +1638,22 @@ const GameEngine = {
     st.answerVisible = false;
     st.transitioning = false;
     st.streak = 0;
+    st.correctTotal = 0;
     st.classSignal = 'unrated';
     st.lastStudentId = null;
     st.selectedStudentId = null;
+    st.groupCount = opts.groupCount || 2;
+    st.lastGroupId = null;
+    st.selectedGroupId = null;
     st.timer = 0;
     if (st.timerId) { clearInterval(st.timerId); st.timerId = null; }
+    st.ladder = !!opts.ladder;
+    st.ladderIndex = opts.ladderIndex || 0;
+
+    // 小组对抗：开始时自动分组
+    if (st.mode === 'group') {
+      Groups.split(st.groupCount);
+    }
 
     let items;
     if (opts.items) items = opts.items;
@@ -1358,8 +1661,20 @@ const GameEngine = {
     else items = [];
 
     st.queue = st.shuffled ? Utils.shuffle(items) : items;
+    // 混合方向：每题随机一个方向；否则每题沿用设定方向
+    const mixedDir = st.direction === "mixed";
+    st.queue.forEach(q => {
+      if (q) q.direction = mixedDir ? (Math.random() < 0.5 ? "word-to-meaning" : "meaning-to-word") : st.direction;
+    });
     st.currentIndex = 0;
     st.currentItem = st.queue[0] || null;
+
+    // 复习池玩法记录：本轮用哪种玩法练了哪些条目
+    if (opts.isReview) {
+      st.queue.forEach(q => {
+        if (q && q.item) ReviewPool.markMode(q.item.id, q.pack.id, st.mode);
+      });
+    }
 
     // 创建课堂 Session
     st.sessionId = Session.create(
@@ -1399,8 +1714,12 @@ const GameEngine = {
       st.hintVisible = true;
       Sound.flip();
       UI.renderGamePhase();
-      // 抢答模式启动计时器
-      if (st.mode === 'rapid-response') GameEngine.startTimer();
+      // 抢答 / 小组对抗启动倒计时
+      if (st.mode === 'rapid-response' || st.mode === 'group') GameEngine.startTimer();
+      // 发音挑战：自动播放发音
+      if (st.mode === 'pronunciation') {
+        setTimeout(() => Sound.tts(st.currentItem ? st.currentItem.item.content : ""), 300);
+      }
     } else if (st.phase === 'hint') {
       // 揭晓答案 — 翻牌动画
       if (st.timerId) { clearInterval(st.timerId); st.timerId = null; }
@@ -1426,6 +1745,28 @@ const GameEngine = {
     }
   },
 
+  // 答对统一处理：连胜 / 集体目标 / 小组加分 / 里程碑
+  onCorrect(){
+    const st = GameEngine.state;
+    st.streak++;
+    st.correctTotal++;
+    Store.data.statistics.masteredCount++;
+    const goal = Store.data.settings.collectiveGoal || 20;
+    if (goal > 0) {
+      if (st.correctTotal === goal) UI.toast("🎉 达成集体目标 " + goal + " 题！全班真棒！", "ok");
+      else if (st.correctTotal === Math.ceil(goal / 2)) UI.toast("🎯 集体目标过半！继续加油！", "ok");
+    }
+    if (st.streak === 3) UI.toast("🔥 全班连对 3 题！继续保持！", "ok");
+    else if (st.streak === 5) UI.toast("⚡ 连对 5 题，速度很棒！", "ok");
+    else if (st.streak === 10) UI.toast("🌟 连对 10 题！难以置信！", "ok");
+    if (st.mode === "group" && st.selectedGroupId) Groups.addScore(st.selectedGroupId, 1);
+  },
+  onWrong(){
+    const st = GameEngine.state;
+    st.streak = 0;
+    Store.data.statistics.weakCount++;
+  },
+
   setClassSignal(signal){
     const st = GameEngine.state;
     if (st.phase !== 'answer' && st.phase !== 'feedback') return;
@@ -1436,17 +1777,12 @@ const GameEngine = {
     }
     // 更新 ReviewPool
     if (st.currentItem && (signal === 'retry' || signal === 'partial')) {
-      ReviewPool.add(st.currentItem.item.id, st.currentItem.pack.id, 'teacher-marked');
+      ReviewPool.add(st.currentItem.item.id, st.currentItem.pack.id, 'teacher-marked', st.mode);
     } else if (st.currentItem && signal === 'mastered') {
       ReviewPool.remove(st.currentItem.item.id, st.currentItem.pack.id);
     }
-    if (signal === 'mastered') {
-      st.streak++;
-      Store.data.statistics.masteredCount++;
-    } else {
-      st.streak = 0;
-      Store.data.statistics.weakCount++;
-    }
+    if (signal === 'mastered') GameEngine.onCorrect();
+    else GameEngine.onWrong();
     Store.data.statistics.totalReviewed++;
     Store.save();
     Sound.correct();
@@ -1457,6 +1793,12 @@ const GameEngine = {
     if (Store.data.settings.autoNext) {
       setTimeout(() => GameEngine.next(), 400);
     }
+  },
+
+  // 发音挑战：再听一遍
+  listen(){
+    const st = GameEngine.state;
+    if (st.currentItem) Sound.tts(st.currentItem.item.content);
   },
 
   startTimer(){
@@ -1491,6 +1833,21 @@ const GameEngine = {
       UI.renderGamePhase();
     } else {
       if (st.sessionId) Session.end(st.sessionId);
+      // 阶梯难度：本轮结束自动升档
+      if (st.ladder && st.pack && st.ladderIndex < Utils.LADDER.length - 1) {
+        const step = Utils.LADDER[st.ladderIndex + 1];
+        UI.toast("⬆️ 阶梯升级 → " + step.label, "ok");
+        GameEngine.start({
+          pack: st.pack,
+          mode: step.mode,
+          direction: step.direction,
+          shuffled: st.shuffled,
+          groupCount: st.groupCount,
+          ladder: true,
+          ladderIndex: st.ladderIndex + 1
+        });
+        return;
+      }
       UI.toast(st.isReview ? "复习完成 🎉" : "本轮完成 🎉", "ok");
     }
   },
@@ -1512,10 +1869,25 @@ const GameEngine = {
     }
   },
 
-  // 抢答模式
+  // 抢答 / 小组对抗：抽人（小组模式先抽组再组内抽人）
   pickStudent(){
     const st = GameEngine.state;
     if (st.transitioning || st.selectedStudentId || UI.wheelRunning) return;
+    if (st.mode === "group") {
+      const group = Groups.pick(st.lastGroupId);
+      if (!group) { UI.toast("暂无小组，请先在「学生名单」添加学生", "err"); return; }
+      const members = group.memberIds.map(id => Students.get(id)).filter(s => s && s.enabled);
+      if (!members.length) { UI.toast("该小组没有可用学生", "err"); return; }
+      const pool = members.filter(s => s.id !== st.lastStudentId);
+      const chosen = (pool.length ? pool : members)[Math.floor(Math.random() * members.length)];
+      st.lastGroupId = group.id;
+      st.selectedGroupId = group.id;
+      st.lastStudentId = chosen.id;
+      st.selectedStudentId = chosen.id;
+      Sound.pick();
+      UI.renderQuizWheel(Object.assign({}, chosen, { group: group }));
+      return;
+    }
     const chosen = Students.pick(st.lastStudentId);
     if (!chosen) { UI.toast("没有可用学生，请先在「学生名单」中添加", "err"); return; }
     st.lastStudentId = chosen.id;
@@ -1533,13 +1905,13 @@ const GameEngine = {
     if (st.sessionId && st.currentItem) {
       Session.recordResult(st.sessionId, st.currentItem.item.id, ok ? "mastered" : "retry", 1, ok ? 1 : 0);
     }
-    if (ok) {
-      st.streak++;
-    } else {
-      st.streak = 0;
-      if (st.currentItem) ReviewPool.add(st.currentItem.item.id, st.currentItem.pack.id, "teacher-marked");
+    if (ok) GameEngine.onCorrect();
+    else {
+      GameEngine.onWrong();
+      if (st.currentItem) ReviewPool.add(st.currentItem.item.id, st.currentItem.pack.id, "teacher-marked", st.mode);
     }
     st.selectedStudentId = null;
+    st.selectedGroupId = null;
     UI.renderQuizPickResult(null);
     UI.toast(ok ? "答对 ✓" : "存疑 ✕", ok ? "ok" : "err");
     UI.renderGamePhase();
@@ -1639,6 +2011,8 @@ const UI = {
       Setup.packId = selected;
     }
     document.querySelectorAll("#setup-mode .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === Setup.mode));
+    document.querySelectorAll("#setup-group-count .seg-btn").forEach(b => b.classList.toggle("active", Number(b.dataset.groupcount) === Setup.groupCount));
+    document.getElementById("setup-group-field").classList.toggle("hidden", Setup.mode !== "group");
     document.querySelectorAll("#setup-order .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.order === Setup.order));
     document.querySelectorAll("#setup-direction .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.direction === Setup.direction));
   },
@@ -1720,6 +2094,8 @@ const UI = {
     const list = document.getElementById("weak-list");
     const empty = document.getElementById("weak-empty");
     const btn = document.getElementById("weak-review-btn");
+    // 玩法选择器高亮
+    document.querySelectorAll("#weak-mode-seg .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.weakmode === App.weakMode));
     list.innerHTML = "";
     const packId = Setup.packId || (Store.data.packs[0] ? Store.data.packs[0].id : "");
     const pool = packId ? ReviewPool.getItems(packId) : [];
@@ -1735,11 +2111,15 @@ const UI = {
       const row = el("div", "list-row");
       const main = el("div", "row-main");
       const title = el("div", "row-title", r.item.content);
-      const sub = el("div", "row-sub", r.item.meaning + " · 原因: " + r.reasons.join(", "));
+      const reasons = r.reasons.join(", ");
+      const last = r.lastMode ? " · 上次玩法: " + Utils.modeLabel(r.lastMode) : "";
+      const sub = el("div", "row-sub", r.item.meaning + " · 原因: " + reasons + last);
       main.append(title, sub);
+      const replay = el("button", "btn btn-ghost weak-replay", "换一种方式再练");
+      replay.dataset.action = "weak-replay"; replay.dataset.packId = r.packId; replay.dataset.wordId = r.itemId; replay.dataset.mode = r.lastMode || "";
       const del = el("button", "btn btn-danger", "移除");
       del.dataset.action = "weak-del"; del.dataset.packId = r.packId; del.dataset.wordId = r.itemId;
-      row.append(main, del);
+      row.append(main, replay, del);
       list.appendChild(row);
     });
   },
@@ -1748,20 +2128,24 @@ const UI = {
   renderSettings(){
     document.getElementById("setting-sound").checked = !!Store.data.settings.soundEnabled;
     document.getElementById("setting-autonext").checked = !!Store.data.settings.autoNext;
+    document.getElementById("setting-ladder").checked = !!Store.data.settings.difficultyLadder;
+    const goalEl = document.getElementById("setting-goal");
+    if (goalEl) goalEl.value = Store.data.settings.collectiveGoal || 20;
   },
 
-  // ---- 课堂：游戏阶段渲染（核心） ----
+  // ---- 课堂：游戏阶段渲染（核心，玩法感知） ----
   renderGamePhase(){
     const st = GameEngine.state;
     const item = st.currentItem;
     if (!item || !item.item) return;
-
     const w = item.item;
 
     // 节奏区
-    document.getElementById("cr-mode").textContent = st.mode === "flash-recall" ? "⚡ 闪记挑战" : "🏆 抢答风暴";
+    const modeEmoji = { "flash-recall": "⚡", "rapid-response": "🏆", "picture-hunt": "🖼️", "word-bridge": "🌉", "pronunciation": "🔊", "group": "👥" };
+    document.getElementById("cr-mode").textContent = (modeEmoji[st.mode] || "🎮") + " " + Utils.modeLabel(st.mode);
     document.getElementById("cr-packname").textContent = st.isReview ? "复习池" : (st.pack ? st.pack.name : "");
     document.getElementById("cr-progress").textContent = (st.currentIndex + 1) + " / " + st.queue.length;
+    UI.renderPackSelect(st.pack ? st.pack.id : "");
 
     // 连胜
     const streakEl = document.getElementById("cr-streak");
@@ -1772,16 +2156,60 @@ const UI = {
       streakEl.style.display = "none";
     }
 
+    // 小组积分榜 + 集体目标
+    UI.renderGroupBoard();
+    UI.renderGoal();
+
     // 类型标签
     document.getElementById("card-type-label").textContent = Utils.typeLabel(w.type);
 
-    // 题目区
-    const frontContent = st.direction === "word-to-meaning" ? w.content : w.meaning;
-    document.getElementById("card-front-content").textContent = frontContent;
-    document.getElementById("card-front-phonetic").textContent = w.phonetic || "";
-    document.getElementById("card-hint-text").textContent =
-      st.phase === 'ready' ? "点击卡片或按 空格 查看提示" :
-      st.phase === 'hint' ? "点击揭晓答案" : "";
+    // 题目区（按玩法渲染正面）
+    const frontEl = document.getElementById("card-front-content");
+    const phonEl = document.getElementById("card-front-phonetic");
+    const hintEl = document.getElementById("card-hint-text");
+    frontEl.querySelectorAll("img").forEach(x => x.remove());
+    frontEl.className = "card-content";
+    const dir = (st.currentItem ? st.currentItem.direction : st.direction) === "word-to-meaning";
+    const frontText = dir ? w.content : w.meaning;
+
+    if (st.mode === "picture-hunt") {
+      // 正面 = 图片线索（emoji 或教师上传图片）
+      const vis = Media.visual(w);
+      if (vis.kind === "image") {
+        frontEl.textContent = "";
+        const img = document.createElement("img");
+        img.src = vis.value;
+        img.alt = "";
+        img.className = "card-image";
+        frontEl.appendChild(img);
+      } else {
+        frontEl.className = "card-content card-emoji";
+        frontEl.textContent = vis.value;
+      }
+      phonEl.textContent = "";
+      hintEl.textContent = st.phase === 'ready' ? "看图回忆单词 · 点击或空格" : st.phase === 'hint' ? "点击揭晓单词" : "";
+    } else if (st.mode === "word-bridge") {
+      // 正面 = 内容；提示面 = 例句"桥"（上下文线索）
+      frontEl.textContent = frontText;
+      phonEl.textContent = "";
+      if (st.phase === 'hint') {
+        if (w.example) { frontEl.textContent = w.example; hintEl.textContent = "例句线索 · 点击揭晓释义"; }
+        else hintEl.textContent = "联想它的用法 · 点击揭晓释义";
+      } else {
+        hintEl.textContent = st.phase === 'ready' ? "点击查看上下文线索" : "";
+      }
+    } else if (st.mode === "pronunciation") {
+      frontEl.textContent = (st.phase === 'answer' || st.phase === 'feedback') ? w.content : frontText;
+      phonEl.textContent = (st.phase === 'answer' || st.phase === 'feedback') ? (w.phonetic || "") : "";
+      hintEl.textContent = st.phase === 'ready' ? "点击或空格 听发音" : st.phase === 'hint' ? "点击揭晓单词" : "";
+    } else {
+      // flash-recall / rapid-response / group
+      frontEl.textContent = frontText;
+      phonEl.textContent = w.phonetic || "";
+      hintEl.textContent =
+        st.phase === 'ready' ? "点击卡片或按 空格 查看提示" :
+        st.phase === 'hint' ? "点击揭晓答案" : "";
+    }
 
     // 答案面（始终填充）
     document.getElementById("card-back-content").textContent = w.content;
@@ -1793,22 +2221,82 @@ const UI = {
     UI.renderTimer();
   },
 
+  // 小组积分榜（节奏区）
+  renderGroupBoard(){
+    const st = GameEngine.state;
+    const board = document.getElementById("cr-group-board");
+    if (st.mode !== "group") { board.classList.add("hidden"); return; }
+    board.classList.remove("hidden");
+    board.innerHTML = "";
+    const groups = Groups.all();
+    if (!groups.length) { board.textContent = "暂无小组（请先添加学生）"; return; }
+    const max = Math.max(...groups.map(g => g.score), 1);
+    groups.forEach(g => {
+      const chip = el("div", "group-score" + (g.score === max && g.score > 0 ? " lead" : ""), "");
+      const name = el("span", "", g.name);
+      const pts = el("span", "pts", g.score + " 分");
+      chip.append(name, pts);
+      board.appendChild(chip);
+    });
+  },
+
+  // 课堂内词包下拉（切包不退出课堂；词包列表变化时重建选项）
+  renderPackSelect(currentId){
+    const sel = document.getElementById("cr-pack-select");
+    if (!sel) return;
+    const sig = Store.data.packs.map(p => p.id + ":" + p.items.length).join("|");
+    if (sel.dataset.sig !== sig) {
+      sel.innerHTML = "";
+      Store.data.packs.forEach(p => {
+        const o = document.createElement("option");
+        o.value = p.id; o.textContent = p.name + " (" + p.items.length + " 词)";
+        sel.appendChild(o);
+      });
+      sel.dataset.sig = sig;
+    }
+    if (currentId) sel.value = currentId;
+  },
+
+  // 集体目标进度（节奏区）
+  renderGoal(){
+    const st = GameEngine.state;
+    const goalEl = document.getElementById("cr-goal");
+    const goal = Store.data.settings.collectiveGoal || 20;
+    if (st.mode === "group") { goalEl.classList.add("hidden"); return; }
+    goalEl.classList.remove("hidden");
+    const c = st.correctTotal;
+    document.getElementById("cr-goal-text").textContent = "🎯 集体目标 " + c + "/" + goal;
+    const fill = document.getElementById("cr-goal-fill");
+    const pct = Math.min(100, Math.round(c / goal * 100));
+    fill.style.width = pct + "%";
+    fill.classList.toggle("done", pct >= 100);
+  },
+
   renderGameControls(){
     const st = GameEngine.state;
     const flashGroup = document.getElementById("cr-flash-controls");
     const rapidGroup = document.getElementById("cr-rapid-controls");
     const feedbackBar = document.getElementById("cr-feedback-bar");
 
-    flashGroup.classList.toggle("hidden", st.mode !== "flash-recall");
-    rapidGroup.classList.toggle("hidden", st.mode !== "rapid-response");
+    const isFlipMode = st.mode === "flash-recall" || st.mode === "picture-hunt" || st.mode === "word-bridge" || st.mode === "pronunciation";
+    const isRapidMode = st.mode === "rapid-response" || st.mode === "group";
+    flashGroup.classList.toggle("hidden", !isFlipMode);
+    rapidGroup.classList.toggle("hidden", !isRapidMode);
 
     // 揭晓按钮文本
     const advanceBtns = document.querySelectorAll('[data-action="advance"]');
-    const advLabel = st.phase === 'ready' ? "🔍 查看提示" : st.phase === 'hint' ? "揭晓答案" : "已完成";
+    let advLabel = "🔍 查看提示";
+    if (st.phase === 'ready') {
+      advLabel = st.mode === "picture-hunt" ? "👀 看图" : st.mode === "word-bridge" ? "🌉 看线索" : st.mode === "pronunciation" ? "🔊 听发音" : "🔍 查看提示";
+    } else if (st.phase === 'hint') {
+      advLabel = st.mode === "word-bridge" ? "揭晓释义" : "揭晓答案";
+    } else {
+      advLabel = "已完成";
+    }
     advanceBtns.forEach(b => { b.textContent = advLabel; });
 
-    // 反馈栏：在 answer+feedback 阶段显示
-    const showFeedback = (st.phase === 'answer' || st.phase === 'feedback') && st.mode === 'flash-recall';
+    // 反馈栏：answer+feedback 阶段显示（翻牌类玩法）
+    const showFeedback = (st.phase === 'answer' || st.phase === 'feedback') && isFlipMode;
     feedbackBar.classList.toggle("hidden", !showFeedback);
 
     // 下一题按钮
@@ -1816,19 +2304,25 @@ const UI = {
     const canNext = st.phase === 'feedback' || st.phase === 'ready';
     nextBtns.forEach(b => b.disabled = !canNext);
 
-    // 抢答模式按钮
-    if (st.mode === "rapid-response") {
+    // 发音挑战：ready/hint 阶段显示"再听一遍"
+    const listenBtn = document.getElementById("btn-listen");
+    if (listenBtn) listenBtn.classList.toggle("hidden", !(st.mode === "pronunciation" && (st.phase === 'ready' || st.phase === 'hint')));
+
+    // 抢答 / 小组模式按钮
+    if (isRapidMode) {
       const cBtn = document.querySelector('[data-action="judge-correct"]');
       const wBtn = document.querySelector('[data-action="judge-weak"]');
       if (cBtn) cBtn.disabled = !st.selectedStudentId;
       if (wBtn) wBtn.disabled = !st.selectedStudentId;
+      const pickBtn = document.querySelector('[data-action="pick-student"]');
+      if (pickBtn) pickBtn.textContent = st.mode === "group" ? "🎯 抽一组" : "🎯 随机抽人";
     }
   },
 
   renderTimer(){
     const st = GameEngine.state;
     const el = document.getElementById("cr-timer");
-    if (st.mode === "rapid-response" && st.phase === 'hint' && st.timer > 0) {
+    if ((st.mode === "rapid-response" || st.mode === "group") && st.phase === 'hint' && st.timer > 0) {
       el.textContent = "⏱ " + st.timer + "s";
       el.style.display = "inline";
     } else {
@@ -1860,7 +2354,8 @@ const UI = {
       pick.classList.remove("hidden");
       pick.innerHTML = "";
       const name = el("div", "", student.name);
-      const sub = el("div", "sub", "已被抽中 " + student.callCount + " 次");
+      const subTxt = student.group ? student.group.name + " · 已被抽中 " + student.callCount + " 次" : "已被抽中 " + student.callCount + " 次";
+      const sub = el("div", "sub", subTxt);
       pick.append(name, sub);
       UI.renderGameControls();
     }, 1250);
@@ -1895,6 +2390,11 @@ const UI = {
     document.getElementById("w-phonetic").value = w ? w.phonetic : "";
     document.getElementById("w-meaning").value = w ? w.meaning : "";
     document.getElementById("w-example").value = w ? w.example : "";
+    const imgInput = document.getElementById("w-image");
+    imgInput.value = w ? (w.image || "") : "";
+    const preview = document.getElementById("w-image-preview");
+    preview.classList.toggle("hidden", !imgInput.value);
+    preview.textContent = imgInput.value;
     UI.openModal("modal-word");
     document.getElementById("w-content").focus();
   },
@@ -1924,6 +2424,12 @@ const UI = {
     } else {
       title.textContent = "导入 JSON 备份恢复数据";
       hint.textContent = "选择由本应用「导出 JSON 备份」生成的文件。导入后将覆盖当前全部数据。";
+    }
+    // 粘贴导入区：仅词包内容导入时显示
+    const pasteBox = document.getElementById("paste-box");
+    if (pasteBox) {
+      pasteBox.classList.toggle("hidden", target !== "words");
+      document.getElementById("paste-text").value = "";
     }
     UI.openModal("modal-import");
   },
@@ -1963,6 +2469,7 @@ const App = {
   editingStudentId: null,
   importTarget: null,
   confirmCb: null,
+  weakMode: "flash-recall",
   actions: {
     "go-home": () => UI.showView("home"),
     "go-setup": () => UI.showView("setup"),
@@ -1987,6 +2494,7 @@ const App = {
     "pick-student": () => GameEngine.pickStudent(),
     "judge-correct": () => GameEngine.judge("correct"),
     "judge-weak": () => GameEngine.judge("weak"),
+    "listen": () => GameEngine.listen(),
     "create-pack": () => UI.openPackModal(),
     "edit-pack": () => UI.openPackModal(App.packId),
     "edit-pack-row": (t) => UI.openPackModal(t.dataset.packId),
@@ -2006,6 +2514,10 @@ const App = {
     "close-student": () => UI.closeModal("modal-student"),
     "export-json": () => App.exportJSON(),
     "import-json": () => UI.openImportModal("backup"),
+    "import-words": () => UI.openImportModal("words"),
+    "import-students": () => UI.openImportModal("students"),
+    "paste-import": () => UI.openImportModal("words"),
+    "paste-import-run": () => App.handlePasteImport(),
     "restore-demo": () => App.restoreDemo(),
     "clear-all": () => App.clearAll(),
     "close-import": () => UI.closeModal("modal-import"),
@@ -2022,38 +2534,84 @@ const App = {
       ReviewPool.remove(t.dataset.wordId, t.dataset.packId);
       UI.renderWeak();
       UI.toast("已移出复习池", "ok");
-    }
+    },
+    "weak-mode": (t) => {
+      App.weakMode = t.dataset.weakmode;
+      UI.renderWeak();
+    },
+    "weak-replay": (t) => App.replayWeakItem(t.dataset.packId, t.dataset.wordId, t.dataset.mode),
+    "temp-word": () => UI.openModal("modal-tempword"),
+    "close-tempword": () => UI.closeModal("modal-tempword"),
+    "save-tempword": () => App.saveTempWord()
   },
 
   startClass(){
     const pack = ItemBank.get(Setup.packId);
     if (!pack) { UI.toast("请先选择词包", "err"); return; }
     if (!pack.items.length) { UI.toast("该词包还没有内容，请先添加或导入", "err"); return; }
-    if (Setup.mode === "rapid-response" && !Students.enabledList().length) {
-      UI.toast("抢答风暴需要至少一名可用学生", "err"); return;
+    if ((Setup.mode === "rapid-response" || Setup.mode === "group") && !Students.enabledList().length) {
+      UI.toast("该玩法需要至少一名可用学生，请先在「学生名单」添加", "err"); return;
     }
     GameEngine.start({
       pack: pack,
       mode: Setup.mode,
       direction: Setup.direction,
-      shuffled: Setup.order === "shuffle"
+      shuffled: Setup.order === "shuffle",
+      groupCount: Setup.groupCount,
+      ladder: !!Store.data.settings.difficultyLadder
     });
   },
 
-  startWeakReview(){
+  startWeakReview(mode){
     const packId = Setup.packId || (Store.data.packs[0] ? Store.data.packs[0].id : "");
     if (!packId) { UI.toast("请先选择一个词包", "err"); return; }
     const pool = ReviewPool.getItems(packId);
     if (!pool.length) { UI.toast("当前没有待复习内容", "err"); return; }
     const pack = ItemBank.get(packId);
     GameEngine.start({
-      mode: "flash-recall",
+      mode: mode || App.weakMode,
       direction: Setup.direction,
       shuffled: true,
       isReview: true,
       items: pool.map(r => ({ pack, item: r.item })),
       pack
     });
+  },
+
+  // 复习池"换一种方式再练"：用与上次不同的玩法，单独重练某一条
+  replayWeakItem(packId, itemId, lastMode){
+    const pack = ItemBank.get(packId);
+    if (!pack) { UI.toast("词包不存在", "err"); return; }
+    const item = pack.items.find(i => i.id === itemId);
+    if (!item) { UI.toast("词条不存在", "err"); return; }
+    GameEngine.start({
+      mode: Utils.nextMode(lastMode),
+      direction: Setup.direction,
+      shuffled: false,
+      isReview: true,
+      items: [{ pack, item }],
+      pack
+    });
+  },
+
+  // 课堂内临时词条：加入当前词包，并排入当前课堂队列末尾
+  saveTempWord(){
+    const content = document.getElementById("tw-content").value.trim();
+    const meaning = document.getElementById("tw-meaning").value.trim();
+    if (!content || !meaning) { UI.toast("请填写英文内容与中文释义", "err"); return; }
+    const st = GameEngine.state;
+    const pack = st.active ? st.pack : ItemBank.get(Setup.packId);
+    if (!pack) { UI.toast("没有可用词包", "err"); return; }
+    const item = ItemBank.addItem(pack.id, { type: "word", content, meaning });
+    if (st.active) {
+      const mixedDir = st.direction === "mixed";
+      st.queue.push({ pack, item, direction: mixedDir ? (Math.random() < 0.5 ? "word-to-meaning" : "meaning-to-word") : st.direction });
+      UI.renderGamePhase();
+    }
+    UI.closeModal("modal-tempword");
+    document.getElementById("tw-content").value = "";
+    document.getElementById("tw-meaning").value = "";
+    UI.toast("已添加临时词条：「" + content + "」", "ok");
   },
 
   savePack(){
@@ -2074,7 +2632,8 @@ const App = {
       content: document.getElementById("w-content").value,
       phonetic: document.getElementById("w-phonetic").value,
       meaning: document.getElementById("w-meaning").value,
-      example: document.getElementById("w-example").value
+      example: document.getElementById("w-example").value,
+      image: document.getElementById("w-image").value.trim()
     };
     if (!f.content.trim()) { UI.toast("请输入英文内容", "err"); return; }
     if (!f.meaning.trim()) { UI.toast("请输入中文释义", "err"); return; }
@@ -2150,6 +2709,26 @@ const App = {
   },
 
   // ---- 导入处理 ----
+
+  // 粘贴表格解析导入：每行一列（内容/释义/例句），Tab 或多空格分隔
+  handlePasteImport(){
+    const text = document.getElementById("paste-text").value;
+    if (!text.trim()) { UI.toast("请先粘贴内容", "err"); return; }
+    const parsed = Importer.parsePasted(text);
+    if (!parsed.items.length) { UI.toast("没有解析到有效条目（需包含内容与释义）", "err"); return; }
+    const added = ItemBank.mergeImport(App.packId, parsed.items);
+    const duplicates = parsed.items.length - added;
+    UI.closeModal("modal-import");
+    UI.renderPackDetail(App.packId);
+    UI.showImportResult({
+      total: parsed.items.length + parsed.skipped.length,
+      success: added,
+      skipped: parsed.skipped.length,
+      note: duplicates > 0 ? "其中 " + duplicates + " 条因重复被跳过" : "",
+      skippedReasons: parsed.skipped.slice(0, 8).map(s => "第 " + s.line + " 行：" + s.reason)
+    });
+    UI.toast("已导入 " + added + " 条内容", "ok");
+  },
   handleWordImport(file, text){
     const parsed = Importer.parseByExt(file.name, text);
     if (parsed.fatal) { UI.showImportError(parsed.fatal); return; }
@@ -2208,9 +2787,15 @@ function wireEvents(){
     if (!t) return;
     if (t.classList.contains("seg-btn")) {
       // 分段选择器
-      if (t.dataset.mode) Setup.mode = t.dataset.mode;
+      if (t.dataset.mode) {
+        Setup.mode = t.dataset.mode;
+        const gf = document.getElementById("setup-group-field");
+        if (gf) gf.classList.toggle("hidden", Setup.mode !== "group");
+      }
+      else if (t.dataset.groupcount) Setup.groupCount = Number(t.dataset.groupcount);
       else if (t.dataset.order) Setup.order = t.dataset.order;
       else if (t.dataset.direction) Setup.direction = t.dataset.direction;
+      else if (t.dataset.weakmode) App.weakMode = t.dataset.weakmode;
       else if (t.dataset.type) {
         // 内容类型选择器
         t.parentElement.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
@@ -2240,9 +2825,10 @@ function wireEvents(){
     else if (e.key === "Enter") { e.preventDefault(); GameEngine.next(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); GameEngine.prev(); }
     else if (e.key === "ArrowRight") { e.preventDefault(); GameEngine.next(); }
-    else if (e.key === "s" || e.key === "S") { e.preventDefault(); if (st.mode === "rapid-response") GameEngine.pickStudent(); }
-    else if (e.key === "g" || e.key === "G") { e.preventDefault(); if (st.mode === "rapid-response") GameEngine.judge("correct"); }
-    else if (e.key === "r" || e.key === "R") { e.preventDefault(); if (st.mode === "rapid-response") GameEngine.judge("weak"); }
+    else if (e.key === "s" || e.key === "S") { e.preventDefault(); if (st.mode === "rapid-response" || st.mode === "group") GameEngine.pickStudent(); }
+    else if (e.key === "g" || e.key === "G") { e.preventDefault(); if (st.mode === "rapid-response" || st.mode === "group") GameEngine.judge("correct"); }
+    else if (e.key === "r" || e.key === "R") { e.preventDefault(); if (st.mode === "rapid-response" || st.mode === "group") GameEngine.judge("weak"); }
+    else if (e.key === "l" || e.key === "L") { e.preventDefault(); if (st.mode === "pronunciation") GameEngine.listen(); }
     else if (e.key === "Escape") { e.preventDefault(); GameEngine.exit(); }
   });
 
@@ -2276,6 +2862,41 @@ function wireEvents(){
     Store.data.settings.autoNext = e.target.checked;
     Store.save();
   });
+  document.getElementById("setting-ladder").addEventListener("change", (e) => {
+    Store.data.settings.difficultyLadder = e.target.checked;
+    Store.save();
+    UI.toast(e.target.checked ? "阶梯难度已开启：本轮结束后自动升级玩法" : "已关闭阶梯难度", "ok");
+  });
+  document.getElementById("setting-goal").addEventListener("change", (e) => {
+    Store.data.settings.collectiveGoal = Math.max(0, Number(e.target.value) || 0);
+    Store.save();
+  });
+
+  // 课堂内切换词包（不退出课堂）
+  document.getElementById("cr-pack-select").addEventListener("change", (e) => {
+    const pid = e.target.value;
+    const p = pid ? ItemBank.get(pid) : null;
+    if (!p) return;
+    const st = GameEngine.state;
+    if (!st.active) { Setup.packId = p.id; return; }
+    GameEngine.start({
+      pack: p,
+      mode: st.mode,
+      direction: st.direction,
+      shuffled: st.shuffled,
+      groupCount: st.groupCount,
+      ladder: st.ladder
+    });
+    UI.toast("已切换词包：「" + p.name + "」", "ok");
+  });
+
+  // 内容编辑器：图片/表情输入即时预览
+  document.getElementById("w-image").addEventListener("input", (e) => {
+    const preview = document.getElementById("w-image-preview");
+    const v = e.target.value.trim();
+    preview.classList.toggle("hidden", !v);
+    preview.textContent = v;
+  });
 
   document.getElementById("weak-review-btn").addEventListener("click", () => App.startWeakReview());
 }
@@ -2288,6 +2909,7 @@ function init(){
   UI.renderHome();
   UI.renderSettings();
   wireEvents();
+  UI.renderPackSelect(Setup.packId);
   UI.showView("home");
   if (!had) {
     UI.openModal("firstrun");
@@ -2297,7 +2919,7 @@ function init(){
 document.addEventListener("DOMContentLoaded", init);
 
 // 调试/自动化测试句柄
-window.__SW = { Utils, Store, ItemBank, ReviewPool, Session, Students, Importer, Sound, Setup, GameEngine, UI, App, seedDemo };
+window.__SW = { Utils, Store, ItemBank, ReviewPool, Session, Students, Importer, Sound, Setup, GameEngine, UI, App, Media, Groups, seedDemo };
 })();
 </script>
 </body>

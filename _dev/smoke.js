@@ -29,7 +29,7 @@ async function main() {
 
   const SW = window.__SW;
   if (!SW) { console.error("未找到 __SW 句柄"); process.exit(1); }
-  const { Utils, Store, ItemBank, ReviewPool, Session, Students, Importer, Setup, GameEngine, UI } = SW;
+  const { Utils, Store, ItemBank, ReviewPool, Session, Students, Importer, Setup, GameEngine, UI, Media, Groups, App, Sound } = SW;
 
   const click = el => el.dispatchEvent(new window.MouseEvent("click", { bubbles: true, detail: 1 }));
   const key = (k, code) => document.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, code: code || k, bubbles: true, cancelable: true }));
@@ -374,6 +374,250 @@ async function main() {
     const minH = parseInt(style.minHeight);
     ok(minH >= 72, "分段按钮 min-height ≥ 72px（当前 " + minH + "px）");
   }
+
+  console.log("\n[17] Media 视觉线索");
+  eq(Media.emojiFor({ content: "apple" }), "🍎", "apple → 🍎");
+  eq(Media.emojiFor({ content: "take care" }), "🙏", "词组 take care → 🙏");
+  eq(Media.emojiFor({ content: "How are you?" }), "💬", "句子 How are you? → 💬");
+  eq(Media.emojiFor({ content: "xyzzy" }), "X", "未知词回退首字母");
+  eq(Media.emojiFor(null), "❓", "空项回退 ❓");
+  ok(Media.visual({ content: "apple" }).kind === "emoji", "无图片时 visual.kind = emoji");
+  const imgItem = { content: "apple", image: "data:image/png;base64,AAA" };
+  ok(Media.visual(imgItem).kind === "image", "有 dataURL 图片时 visual.kind = image");
+  ok(Media.isEmoji("🍎"), "识别 emoji");
+  ok(!Media.isEmoji("data:image/png"), "不把 dataURL 当 emoji");
+
+  console.log("\n[18] Groups 小组均分与公平抽组");
+  Groups.split(2);
+  eq(Store.data.groups.length, 2, "启用学生分为 2 组");
+  const gSizes = Store.data.groups.map(g => g.memberIds.length);
+  ok(Math.max(...gSizes) - Math.min(...gSizes) <= 1, "分组人数均衡（差 ≤1，实际 " + gSizes.join("/") + "）");
+  const g0 = Store.data.groups[0].id, g1 = Store.data.groups[1].id;
+  let lastG = null, sameG = 0;
+  for (let i = 0; i < 100; i++) {
+    const picked = Groups.pick(lastG);
+    if (picked.id === lastG) sameG++;
+    lastG = picked.id;
+  }
+  ok(sameG === 0, "连续抽组不会连续抽同一组");
+  Groups.addScore(g0, 1);
+  ok(Groups.pick(null).id === g1, "得分低的组优先被抽中（g1 得分 0）");
+  ok(Groups.pick(g1).id === g0, "避开上组后抽到 g0");
+  Groups.resetScores();
+  ok(Store.data.groups.every(g => g.score === 0), "resetScores 清零");
+  Groups.split(3);
+  eq(Store.data.groups.length, 3, "可重新分为 3 组");
+  ok(Store.data.groups.every(g => g.memberIds.length >= 2), "3 组人数 ≥2");
+
+  console.log("\n[19] 粘贴表格解析 parsePasted");
+  const paste = Importer.parsePasted("apple\t苹果\tI eat an apple.\nbook  书   This is a book.\nbadline\npen\t笔");
+  eq(paste.items.length, 3, "3 条有效（Tab 与多空格分隔均可）");
+  eq(paste.skipped.length, 1, "1 条跳过（缺释义）");
+  eq(paste.items[0].content, "apple", "内容列解析");
+  eq(paste.items[0].meaning, "苹果", "释义列解析");
+  eq(paste.items[0].example, "I eat an apple.", "例句列解析");
+  eq(paste.items[1].content, "book", "多空格分隔解析（book 不被拆开）");
+
+  console.log("\n[20] P1 玩法：图片侦探 / 词语搭桥 / 复习池换玩法");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 图片侦探：正面 = 图片线索，翻牌到 answer ----
+  const phPack = ItemBank.create("Hunt Test", "");
+  ItemBank.addItem(phPack.id, { content: "apple", meaning: "苹果", type: "word" }); // 无图片 → emoji 回退
+  GameEngine.start({ pack: phPack, mode: "picture-hunt", direction: "word-to-meaning", shuffled: false });
+  ok(GameEngine.state.mode === "picture-hunt", "图片侦探模式启动");
+  const phFront = document.getElementById("card-front-content");
+  ok(phFront.classList.contains("card-emoji"), "图片侦探正面显示 emoji 样式");
+  eq(phFront.textContent, "🍎", "apple → 正面 emoji 🍎");
+  GameEngine.advance();
+  eq(GameEngine.state.phase, "hint", "图片侦探 ready → hint");
+  GameEngine.advance();
+  await sleep(800); // 翻牌动画 timeout 兜底
+  ok(GameEngine.state.answerVisible === true, "图片侦探 hint → answer（翻牌时序正常）");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 词语搭桥：hint 面显示例句"桥" ----
+  const btPack = ItemBank.create("Bridge Test", "");
+  const btItem = ItemBank.addItem(btPack.id, { content: "take care", meaning: "保重；小心", example: "Take care on your way home.", type: "phrase" });
+  const btItemId = btItem.id;
+  GameEngine.start({ pack: btPack, mode: "word-bridge", direction: "word-to-meaning", shuffled: false });
+  const bFront = document.getElementById("card-front-content");
+  const bHint = document.getElementById("card-hint-text");
+  eq(bFront.textContent, "take care", "词语搭桥 ready 正面 = 内容");
+  eq(bHint.textContent, "点击查看上下文线索", "词语搭桥 ready 提示文案");
+  GameEngine.advance();
+  eq(GameEngine.state.phase, "hint", "词语搭桥 ready → hint");
+  eq(bFront.textContent, "Take care on your way home.", "词语搭桥 hint 面 = 例句桥");
+  eq(bHint.textContent, "例句线索 · 点击揭晓释义", "词语搭桥 hint 提示文案");
+  GameEngine.advance();
+  await sleep(800);
+  ok(GameEngine.state.answerVisible === true, "词语搭桥 hint → answer");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 复习池换玩法：nextMode 轮换 + lastMode 记录 + 单条重练 ----
+  eq(Utils.nextMode("flash-recall"), "picture-hunt", "换玩法：闪记 → 图片侦探");
+  eq(Utils.nextMode("picture-hunt"), "word-bridge", "换玩法：图片侦探 → 词语搭桥");
+  eq(Utils.nextMode("word-bridge"), "pronunciation", "换玩法：词语搭桥 → 发音挑战");
+  eq(Utils.nextMode("pronunciation"), "flash-recall", "换玩法：发音 → 闪记（循环）");
+  eq(Utils.nextMode(""), "flash-recall", "从未练过 → 默认闪记挑战");
+
+  ReviewPool.add(btItemId, btPack.id, "teacher-marked", "word-bridge");
+  eq(ReviewPool.getItems(btPack.id)[0].lastMode, "word-bridge", "ReviewPool 记录上次玩法 lastMode");
+
+  App.replayWeakItem(btPack.id, btItemId, "word-bridge");
+  ok(GameEngine.state.active, "replayWeakItem 启动课堂");
+  eq(GameEngine.state.mode, "pronunciation", "单条重练用下一不同玩法（word-bridge → pronunciation）");
+  ok(GameEngine.state.isReview === true, "重练标记为复习");
+  eq(GameEngine.state.queue.length, 1, "重练只包含该 1 条");
+  eq(GameEngine.state.queue[0].item.id, btItemId, "重练目标是该条");
+  GameEngine.exit();
+
+  console.log("\n[21] P2 玩法：发音挑战 / 小组对抗");
+  await sleep(50);
+
+  // ---- 发音挑战：hint 自动 TTS + 再听一遍 + 揭晓面含音标 ----
+  const prPack = ItemBank.create("Pr Test", "");
+  ItemBank.addItem(prPack.id, { content: "apple", phonetic: "/ˈæp.əl/", meaning: "苹果", type: "word" });
+  let ttsCalls = 0;
+  const origTts = Sound.tts;
+  Sound.tts = () => { ttsCalls++; };
+  GameEngine.start({ pack: prPack, mode: "pronunciation", direction: "word-to-meaning", shuffled: false });
+  GameEngine.advance(); // ready → hint（300ms 后自动 TTS）
+  eq(GameEngine.state.phase, "hint", "发音挑战 ready → hint");
+  const prPhon = document.getElementById("card-front-phonetic");
+  eq(prPhon.textContent, "", "hint 阶段先不显示音标");
+  await sleep(450);
+  ok(ttsCalls >= 1, "hint 自动播放 TTS（ttsCalls=" + ttsCalls + "）");
+  GameEngine.listen();
+  eq(ttsCalls, 2, "「再听一遍」再次调用 TTS");
+  const listenBtn = document.getElementById("btn-listen");
+  ok(!listenBtn.classList.contains("hidden"), "发音挑战显示「再听一遍」按钮");
+  GameEngine.advance(); // hint → answer
+  await sleep(800);
+  ok(GameEngine.state.answerVisible === true, "发音挑战 hint → answer（翻牌时序正常）");
+  eq(prPhon.textContent, "/ˈæp.əl/", "揭晓面含音标");
+  GameEngine.exit();
+  await sleep(50);
+  Sound.tts = origTts;
+
+  // ---- 小组对抗：先抽组再抽人 + 答对加分 + 积分榜 ----
+  Groups.resetScores();
+  const grPack = Store.data.packs[0];
+  GameEngine.start({ pack: grPack, mode: "group", shuffled: false, groupCount: 3 });
+  ok(GameEngine.state.mode === "group", "小组对抗模式启动");
+  eq(Store.data.groups.length, 3, "start 时自动分为 3 组");
+  GameEngine.advance();
+  eq(GameEngine.state.phase, "hint", "小组对抗 ready → hint");
+  ok(GameEngine.state.timer === 5, "小组对抗计时器 = 5s");
+  GameEngine.pickStudent();
+  ok(!!GameEngine.state.selectedGroupId, "先抽到一组");
+  ok(!!GameEngine.state.selectedStudentId, "再抽到该组一名学生");
+  const gid = GameEngine.state.selectedGroupId;
+  await sleep(1400); // 转盘动画
+  ok(!!GameEngine.state.selectedStudentId, "转盘结束后学生仍被选中");
+  const beforeScore = Groups.get(gid).score;
+  GameEngine.judge("correct");
+  ok(GameEngine.state.selectedStudentId === null, "judge 后清除选中学生");
+  ok(GameEngine.state.selectedGroupId === null, "judge 后清除选中小组");
+  eq(Groups.get(gid).score, beforeScore + 1, "答对 → 选中组 +1 分");
+  UI.renderGroupBoard();
+  const board = document.getElementById("cr-group-board");
+  ok(!board.classList.contains("hidden"), "group 模式显示积分榜");
+  eq(board.querySelectorAll(".group-score").length, 3, "积分榜 3 个组条");
+  GameEngine.exit();
+
+  console.log("\n[22] 交叉增强：混合方向 / 阶梯难度 / 集体目标 / 粘贴导入 / 课堂内快捷 / 图片字段");
+  await sleep(50);
+
+  // ---- 混合方向 ----
+  const mxPack = ItemBank.create("Mixed Test", "");
+  ItemBank.addItem(mxPack.id, { content: "apple", meaning: "苹果", type: "word" });
+  ItemBank.addItem(mxPack.id, { content: "book", meaning: "书", type: "word" });
+  GameEngine.start({ pack: mxPack, mode: "flash-recall", direction: "mixed", shuffled: false });
+  const dirs = GameEngine.state.queue.map(q => q.direction);
+  ok(dirs.every(d => d === "word-to-meaning" || d === "meaning-to-word"), "混合方向：每题随机一个方向");
+  UI.renderGamePhase();
+  const mxFront = document.getElementById("card-front-content");
+  eq(mxFront.textContent, dirs[0] === "word-to-meaning" ? "apple" : "苹果", "混合方向：正面渲染与方向一致");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 阶梯难度：一轮结束自动升档 ----
+  const ladPack = ItemBank.create("Ladder Test", "");
+  ItemBank.addItem(ladPack.id, { content: "apple", meaning: "苹果", type: "word" });
+  ItemBank.addItem(ladPack.id, { content: "book", meaning: "书", type: "word" });
+  ItemBank.addItem(ladPack.id, { content: "pen", meaning: "笔", type: "word" });
+  GameEngine.start({ pack: ladPack, mode: "flash-recall", direction: "word-to-meaning", shuffled: false, ladder: true, ladderIndex: 0 });
+  ok(GameEngine.state.ladder === true, "阶梯难度开启");
+  for (let i = 0; i < 3; i++) {
+    GameEngine.advance();          // ready → hint
+    GameEngine.advance();          // hint → answer
+    await sleep(800);
+    GameEngine.setClassSignal("mastered");
+    GameEngine.next();
+    await sleep(50);
+  }
+  ok(GameEngine.state.active, "升档后课堂仍活跃");
+  eq(GameEngine.state.mode, "flash-recall", "升档到 L2 仍为闪记");
+  eq(GameEngine.state.direction, "meaning-to-word", "升档到 L2 方向 = 中→英");
+  eq(GameEngine.state.ladderIndex, 1, "ladderIndex = 1");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 集体目标计数 ----
+  const goalPack = ItemBank.create("Goal Test", "");
+  ItemBank.addItem(goalPack.id, { content: "apple", meaning: "苹果", type: "word" });
+  Store.data.settings.collectiveGoal = 1;
+  GameEngine.start({ pack: goalPack, mode: "flash-recall", direction: "word-to-meaning", shuffled: false });
+  GameEngine.advance();
+  GameEngine.advance();
+  await sleep(800);
+  GameEngine.setClassSignal("mastered");
+  eq(GameEngine.state.correctTotal, 1, "集体目标计数 +1");
+  const toastEls = document.querySelectorAll("#toast-wrap .toast");
+  ok([...toastEls].some(t => t.textContent.indexOf("达成集体目标") >= 0), "达成目标触发庆祝 toast");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 粘贴导入（UI 路径） ----
+  UI.showView("pack", mxPack.id);
+  UI.openImportModal("words");
+  ok(!document.getElementById("paste-box").classList.contains("hidden"), "词包导入模态显示粘贴区");
+  document.getElementById("paste-text").value = "dog\t狗\ncat\t猫\nbanana";
+  App.handlePasteImport();
+  const mxAfter = ItemBank.get(mxPack.id);
+  ok(mxAfter.items.some(i => i.content === "dog"), "粘贴导入加入 dog");
+  ok(mxAfter.items.some(i => i.content === "cat"), "粘贴导入加入 cat");
+  ok(!mxAfter.items.some(i => i.content === "banana"), "缺释义行被跳过");
+
+  // ---- 课堂内切词包 + 临时词条 ----
+  GameEngine.start({ pack: mxPack, mode: "flash-recall", direction: "word-to-meaning", shuffled: false });
+  GameEngine.advance(); // 触发 renderGamePhase → 填充下拉
+  const sel = document.getElementById("cr-pack-select");
+  ok(sel.options.length >= 4, "课堂词包下拉含全部词包（" + sel.options.length + " 个）");
+  sel.value = ladPack.id;
+  sel.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await sleep(50);
+  eq(GameEngine.state.pack.id, ladPack.id, "课堂内切换词包生效");
+  document.getElementById("tw-content").value = "desk";
+  document.getElementById("tw-meaning").value = "课桌";
+  const beforeLen = GameEngine.state.queue.length;
+  App.saveTempWord();
+  ok(ItemBank.get(ladPack.id).items.some(i => i.content === "desk"), "临时词条已加入词包");
+  eq(GameEngine.state.queue.length, beforeLen + 1, "临时词条排入当前队列末尾");
+  GameEngine.exit();
+  await sleep(50);
+
+  // ---- 内容编辑器：图片/表情字段 ----
+  const imgEdit = ItemBank.addItem(ladPack.id, { content: "dog", meaning: "狗", image: "🐕", type: "word" });
+  ok(imgEdit.image === "🐕", "图片/表情字段保存");
+  UI.openWordModal(ladPack.id, imgEdit.id);
+  eq(document.getElementById("w-image").value, "🐕", "编辑时回填图片字段");
+  ok(!document.getElementById("w-image-preview").classList.contains("hidden"), "图片预览可见");
+  UI.closeModal("modal-word");
 
   console.log("\n======================");
   console.log("通过 " + passed + " · 失败 " + failed);
