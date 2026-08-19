@@ -36,7 +36,7 @@ npm install
 # 本地运行（构建 + 启动 Electron）
 npm start
 
-# 仅运行测试（67 项纯逻辑单测，无需 Electron）
+# 仅运行测试（88 项纯逻辑单测，无需 Electron）
 npm test
 
 # 类型检查
@@ -101,14 +101,14 @@ SpeedWord/
 ├─ assets/               # 内置词典（en_US/en_UK IPA）+ 29 张内置图 + icon.ico
 ├─ examples/             # 示例词包（.swpack）与示例数据
 ├─ scripts/              # prepare-assets / after-build / clean
-├─ tests/                # 67 项纯逻辑单测（vitest，node 环境，无需 Electron）
+├─ tests/                # 88 项纯逻辑单测（vitest，node 环境，无需 Electron）
 └─ docs/                 # 开发环境说明 / API 配置说明
 ```
 
 ## 测试
 
 ```bash
-npm test    # 67 项通过：类型识别 / 字段状态与锁定 / 课堂状态机 / 出题队列 / 8玩法出题 / IPA / 备份与回滚
+npm test    # 88 项通过：类型识别 / 字段状态与锁定 / 课堂状态机 / 出题队列 / 8玩法出题 / IPA / 备份与回滚 / AI 配置链
 npm run typecheck
 npm run build
 ```

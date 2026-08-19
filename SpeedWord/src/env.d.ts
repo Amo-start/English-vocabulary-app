@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { SpeedWordApi } from "./shared/api";
+import type { SpeedWordApi, ElectronApi } from "./shared/api";
 
 declare module "*.vue" {
   import type { DefineComponent } from "vue";
@@ -11,6 +11,7 @@ declare module "*.vue" {
 declare global {
   interface Window {
     api: SpeedWordApi;
+    electronAPI: ElectronApi;
   }
 }
 

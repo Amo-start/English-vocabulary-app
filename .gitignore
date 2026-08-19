@@ -3,10 +3,19 @@ SpeedWord/node_modules/
 SpeedWord/dist/
 SpeedWord/index.html
 SpeedWord/package-lock.json
+SpeedWord/release/
+SpeedWord/electron-dist/
+SpeedWord/_dev/
 
 # 开发辅助（非交付物）
 _dev/node_modules/
 _dev/package-lock.json
+_dev/read-v4.mjs
+_dev/v3-doc.txt
+_dev/v4-doc.txt
+
+# 下载参考文档
+_dl/
 
 # 临时文件
 *.log

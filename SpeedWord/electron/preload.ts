@@ -2,7 +2,7 @@
 // 通过 contextBridge 暴露最小白名单 IPC；渲染进程无 Node.js 能力、不接触明文 API Key。
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
-import type { SpeedWordApi } from "../src/shared/api";
+import type { SpeedWordApi, ElectronApi } from "../src/shared/api";
 
 const api: SpeedWordApi = {
   // 词包
@@ -66,3 +66,18 @@ const api: SpeedWordApi = {
 };
 
 contextBridge.exposeInMainWorld("api", api);
+
+// electronAPI.ai：AI 服务配置链专用命名空间。
+// 只暴露六个白名单方法，绝不暴露 ipcRenderer 本体。
+const electronApi: ElectronApi = {
+  ai: {
+    saveConfig: (config, keys) => ipcRenderer.invoke("ai:saveConfig", config, keys),
+    getConfig: () => ipcRenderer.invoke("ai:getConfig"),
+    testText: () => ipcRenderer.invoke("ai:testText"),
+    testImage: () => ipcRenderer.invoke("ai:testImage"),
+    generateText: (prompt, opts) => ipcRenderer.invoke("ai:generateText", prompt, opts),
+    generateImage: (prompt) => ipcRenderer.invoke("ai:generateImage", prompt)
+  }
+};
+
+contextBridge.exposeInMainWorld("electronAPI", electronApi);

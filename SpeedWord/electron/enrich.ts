@@ -2,15 +2,13 @@
 // 异常按词条隔离：单个词条失败不影响其他词条。
 import { DictionaryService, dictionaryService, type DictEntry } from "./dictionary";
 import {
-  resolveAiCfg, OpenAiCompatibleText, OpenAiCompatibleImage, parseModelJson, AiError,
+  collectResolvedCfg, OpenAiCompatibleText, OpenAiCompatibleImage, parseModelJson, AiError,
   type ResolvedAiCfg
 } from "./ai";
 import {
   findBuiltinImage, searchImageApi, generateImage, cacheApiImage, builtinUrl, newImagePlaceholder
 } from "./images";
-import { getSecret } from "./secure-store";
 import type { Db } from "./db";
-import { readAiConfig } from "./db";
 import { detectContentType, typeLabel } from "../src/shared/type-detect";
 import { uid } from "../src/shared/uuid";
 import { EMPTY_FIELD_STATE } from "../src/shared/fieldstate";
@@ -198,15 +196,8 @@ async function enrichOne(
 
 // ---------- 对外入口 ----------
 export async function enrichItems(db: Db, items: EnrichRequestItem[], opts: EnrichOpts = {}): Promise<EnrichResult[]> {
-  const config = readAiConfig(db.db);
-  const secrets = {
-    main: getSecret(db, "main"),
-    text: getSecret(db, "text"),
-    image: getSecret(db, "image"),
-    dictionary: getSecret(db, "dictionary")
-  };
-  const cfg = resolveAiCfg(config, secrets);
-  const useAi = !opts.offlineOnly && config.mode !== "off";
+  const cfg = await collectResolvedCfg(db);
+  const useAi = !opts.offlineOnly && cfg.text.enabled;
   const useOnlineDict = !opts.offlineOnly;
 
   const total = items.length;
@@ -263,9 +254,7 @@ export async function regenerateField(
   item: ContentItem,
   field: "meaningZh" | "example" | "definitionEn" | "memoryHint" | "image"
 ): Promise<Partial<ContentItem>> {
-  const config = readAiConfig(db.db);
-  const secrets = { main: getSecret(db, "main"), text: getSecret(db, "text"), image: getSecret(db, "image"), dictionary: getSecret(db, "dictionary") };
-  const cfg = resolveAiCfg(config, secrets);
+  const cfg = await collectResolvedCfg(db);
   if (!cfg.text.enabled) throw new AiError("ai_not_configured", "AI 文本服务未配置");
 
   const ai = await enrichWithAi(cfg.text, item.text, item.type);

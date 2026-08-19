@@ -12,15 +12,16 @@ import {
   settingsGet, settingsSet, aiSettingsGet, aiSettingsSet, readAiConfig, defaultAiConfig, dumpAll, restoreDump,
   type DbDump
 } from "./db";
-import { setSecret, getSecret, hasSecret, type KeySlot } from "./secure-store";
+import { setSecret, hasSecret, type KeySlot } from "./secure-store";
 import { enrichItems, regenerateField } from "./enrich";
 import { dictionaryService } from "./dictionary";
 import { searchImageApi, cacheApiImage, generateImage, importUserImage, builtinUrl } from "./images";
-import { resolveAiCfg, OpenAiCompatibleImage, testConnection, testImageConnection } from "./ai";
+import { collectResolvedCfg, OpenAiCompatibleText, OpenAiCompatibleImage, sanitizeAiConfig, testTextService, testImageService, classifyAiError } from "./ai";
 import { exportPack, importPack, exportFullBackup } from "./backup";
 import { uid } from "../src/shared/uuid";
 import { mediaDir, httpGet, safeStringify } from "./util";
 import type { ContentItem, MediaAsset, ClassroomSession, ClassroomFeedback, ReviewEntry, AiProviderConfig } from "../src/shared/types";
+import type { ServiceTestResult, AiGenerateTextResult, AiGenerateImageResult } from "../src/shared/api";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -115,31 +116,101 @@ export function registerIpc(db: Db): void {
       }
     };
   });
-  ipcMain.handle("ai:setConfig", (_e, config: AiProviderConfig, keys?: { main?: string; text?: string; image?: string; dictionary?: string }) => {
-    // 只存非密钥配置
-    aiSettingsSet(db.db, "config", safeStringify(config));
-    // 密钥单独加密存储
+
+  // 统一保存：清洗配置（归一化 URL、剔除敏感字段）→ 存配置 → 密钥单独加密
+  const saveAiConfig = async (config: AiProviderConfig, keys?: Record<string, string>) => {
+    const clean = sanitizeAiConfig(config);
+    aiSettingsSet(db.db, "config", safeStringify(clean));
     if (keys) {
       const slots: Array<[KeySlot, string | undefined]> = [
         ["main", keys.main], ["text", keys.text], ["image", keys.image], ["dictionary", keys.dictionary]
       ];
       for (const [slot, v] of slots) {
-        if (v !== undefined) setSecret(db, slot, v);
+        if (v !== undefined) await setSecret(db, slot, v);
       }
     }
     db.save();
+    return clean;
+  };
+
+  // electronAPI.ai.saveConfig：保存 + 回读，返回真实持久化后的配置
+  ipcMain.handle("ai:saveConfig", async (_e, config: AiProviderConfig, keys?: Record<string, string>) => {
+    await saveAiConfig(config, keys);
+    const fresh = readAiConfig(db.db);
+    return {
+      ok: true,
+      config: {
+        ...fresh,
+        hasKey: hasSecret(db, "main"),
+        advanced: {
+          ...fresh.advanced,
+          text: { ...fresh.advanced.text, hasKey: hasSecret(db, "text") },
+          image: { ...fresh.advanced.image, hasKey: hasSecret(db, "image") },
+          dictionary: { ...fresh.advanced.dictionary, hasKey: hasSecret(db, "dictionary") }
+        }
+      }
+    };
+  });
+  // 旧通道兼容（window.api.aiSetConfig）
+  ipcMain.handle("ai:setConfig", async (_e, config: AiProviderConfig, keys?: Record<string, string>) => {
+    await saveAiConfig(config, keys);
     return { ok: true };
   });
+
+  // electronAPI.ai.testText：真实调用 POST {baseUrl}/chat/completions
+  ipcMain.handle("ai:testText", async (): Promise<ServiceTestResult> => {
+    const cfg = await collectResolvedCfg(db);
+    return testTextService(cfg.text);
+  });
+  // electronAPI.ai.testImage：真实调用 POST {baseUrl}/images/generations（失败不影响文本服务）
+  ipcMain.handle("ai:testImage", async (): Promise<ServiceTestResult> => {
+    const cfg = await collectResolvedCfg(db);
+    return testImageService(cfg.image);
+  });
+  // 旧通道兼容（window.api.aiTest）
   ipcMain.handle("ai:test", async () => {
-    const c = readAiConfig(db.db);
-    const secrets = {
-      main: getSecret(db, "main"), text: getSecret(db, "text"),
-      image: getSecret(db, "image"), dictionary: getSecret(db, "dictionary")
-    };
-    const cfg = resolveAiCfg(c, secrets);
-    const text = await testConnection(cfg.text);
-    const image = cfg.image.enabled ? await testImageConnection(cfg.image) : { ok: true, message: "未配置图片服务（可跳过）" };
+    const cfg = await collectResolvedCfg(db);
+    const text = await testTextService(cfg.text);
+    const image = await testImageService(cfg.image);
     return { text, image };
+  });
+
+  // electronAPI.ai.generateText
+  ipcMain.handle("ai:generateText", async (_e, prompt: string, opts?: { temperature?: number; json?: boolean }): Promise<AiGenerateTextResult> => {
+    try {
+      const cfg = await collectResolvedCfg(db);
+      if (!cfg.text.enabled) {
+        return { success: false, code: "ai_not_configured", message: "文本服务未配置（关闭或缺少模型）", suggestion: "在「智能服务设置」开启云端/本地模式并填写文本模型" };
+      }
+      const provider = new OpenAiCompatibleText(cfg.text);
+      const text = await provider.complete(
+        [
+          { role: "system", content: "You are a helpful assistant for Chinese middle-school English teachers. Answer concisely in Chinese." },
+          { role: "user", content: prompt }
+        ],
+        { temperature: opts?.temperature ?? 0.7, json: !!opts?.json }
+      );
+      return { success: true, text, model: cfg.text.model };
+    } catch (e) {
+      const c = classifyAiError(e);
+      return { success: false, code: c.code, message: c.message, status: c.status, suggestion: c.suggestion };
+    }
+  });
+
+  // electronAPI.ai.generateImage
+  ipcMain.handle("ai:generateImage", async (_e, prompt: string): Promise<AiGenerateImageResult> => {
+    try {
+      const cfg = await collectResolvedCfg(db);
+      if (!cfg.image.enabled) {
+        return { success: false, code: "ai_not_configured", message: "图片服务未配置（关闭或缺少图片模型）", suggestion: "在「智能服务设置」配置图片模型（可复用文本服务）" };
+      }
+      const provider = new OpenAiCompatibleImage(cfg.image);
+      const img = await provider.generate(prompt);
+      return { success: true, url: img.url, b64: img.b64, model: cfg.image.model };
+    } catch (e) {
+      const c = classifyAiError(e);
+      return { success: false, code: c.code, message: c.message, status: c.status, suggestion: c.suggestion };
+    }
   });
   ipcMain.handle("ai:lookupDict", async (_e, text: string) => {
     const entry = await dictionaryService.lookup(text);
@@ -159,9 +230,7 @@ export function registerIpc(db: Db): void {
     return patch;
   });
   ipcMain.handle("ai:regenImageByDescription", async (_e, item: ContentItem, description: string) => {
-    const c = readAiConfig(db.db);
-    const secrets = { main: getSecret(db, "main"), text: getSecret(db, "text"), image: getSecret(db, "image"), dictionary: getSecret(db, "dictionary") };
-    const cfg = resolveAiCfg(c, secrets);
+    const cfg = await collectResolvedCfg(db);
     if (!cfg.image.enabled) throw new Error("AI 图片服务未配置");
     const gen = await generateImage(new OpenAiCompatibleImage({
       baseUrl: cfg.image.baseUrl, apiKey: cfg.image.apiKey, model: cfg.image.model, provider: cfg.image.provider

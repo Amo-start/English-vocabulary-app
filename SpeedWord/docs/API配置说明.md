@@ -21,13 +21,34 @@
 
 只填一套，Text / Image / Dictionary 都复用：
 
+- **服务商预设**：`Agnes AI`（国内直连，一键填充）或 `自定义（OpenAI 兼容）`—— 软件不硬编码任何服务商，预设只是便捷填充，可随时改
 - **服务商**：OpenAI 兼容 / 其它（模型地址格式一致即可）
-- **API 地址（baseUrl）**：例如 `https://api.openai.com/v1`、Ollama 的 `http://localhost:11434/v1`
+- **API 地址（baseUrl）**：例如 `https://api.agnes-ai.cn/v1`、`https://api.openai.com/v1`、Ollama 的 `http://localhost:11434/v1`
+  - 保存时自动归一化：去首尾空白、去尾部 `/`、保留已有 `/v1`、缺失时补一个 `/v1`（绝不重复追加）
 - **API Key**：`●` 掩码输入；已保存时显示「已配置」占位，不再显示明文
-- **文本模型**：例如 `gpt-4o-mini`、`qwen2.5:7b`（Ollama）
-- **图片模型**：例如 `dall-e-3`、Ollama 的 `stable-diffusion` 等（兼容接口）
+- **文本模型**：例如 `agnes-2.5-flash`、`gpt-4o-mini`、`qwen2.5:7b`（Ollama）
+- **图片模型**：例如 `agnes-image-2.1-flash`、`dall-e-3`、Ollama 的 `stable-diffusion` 等（兼容接口）
 
-点「保存」后建议点「测试连接」，看到「连接成功」再继续。
+### Agnes AI 预设
+
+- 国内：`https://api.agnes-ai.cn/v1`
+- 国际：`https://apihub.agnes-ai.com/v1`
+- 备用：`https://apihub.agnes-ai.cn/v1`
+- 默认模型：文本 `agnes-2.5-flash`，图片 `agnes-image-2.1-flash`
+
+选择预设后可在页面切换「国内 / 国际 / 备用」区域；URL 自动更新。
+
+### 测试连接
+
+页面提供三个按钮，测试前会**先保存当前表单**（保证测的是屏幕上看到的配置），然后**真实调用接口**：
+
+| 按钮 | 行为 |
+|---|---|
+| 测试文本服务 | `POST {baseUrl}/chat/completions`，n=1 最小请求 |
+| 测试图片服务 | `POST {baseUrl}/images/generations`，真实生成 1 张（可能少量计费） |
+| 测试全部 | 文本与图片并行独立执行，图片失败**不影响**文本结果 |
+
+结果卡片显示：模型 / HTTP 状态码 / 实际端点 / 耗时 / 针对性建议（如 401 → 检查 Key、404 → 检查 /v1 与模型名）。
 
 ## 高级配置（独立 Text / Dictionary / Image）
 
@@ -49,10 +70,20 @@
 ## 密钥安全存储（关键设计）
 
 - **API Key 永不写入源码**，也不以明文进数据库。
-- 保存时由主进程 `safeStorage`（Windows 上基于 DPAPI）加密，密文 base64 后存入 `ai_provider_settings` 表。
+- 保存时由主进程 `safeStorage`（Windows 上基于 DPAPI）加密，密文 base64 字符串存入 `ai_provider_settings` 表。
+- 加解密走异步包装 `encryptStringAsync / decryptStringAsync`（`electron/secure-store.ts`），读取时若发现旧格式/兜底格式会自动**重加密升级**（`shouldReEncrypt`）。
 - 渲染进程（页面）只看到 `hasKey: true/false` 与掩码占位，**永远拿不到明文**。
 - AI 请求全部由主进程发出（`electron/ai.ts`），页面无法直接调用第三方 API。
 - 若系统无法加密（极少见），兜底为弱混淆并标记 `plain:`，避免崩溃；Windows 下正常走 DPAPI。
+
+## 渲染端 IPC 边界
+
+- 渲染进程通过 `window.electronAPI.ai`（preload `contextBridge` 白名单暴露）访问 AI 配置链：
+  `saveConfig(config, keys?)` / `getConfig()` / `testText()` / `testImage()` / `generateText(prompt)` / `generateImage(prompt)`。
+- **绝不暴露 `ipcRenderer`**；`contextIsolation=true`、`nodeIntegration=false`。
+- 所有参数与返回值均为 **Structured-Clone 安全**的纯普通对象/字符串/数字 —— 绝不把 Vue ref/reactive Proxy、Error、Buffer 等传过 IPC（否则报 `An object could not be cloned`）。
+- 保存后主进程**回读**配置返回给渲染端，前端以实际持久化结果为准（`hasKey` 等状态不会失同步）。
+- 启动时应用自动读取配置，首页/侧边栏显示「智能服务已连接 / 未配置」。
 
 ## Provider 接口
 
@@ -61,10 +92,31 @@
 ```
 TextProvider.complete(messages, opts?)      → string       （文本补全）
 ImageProvider.generate(prompt, opts?)      → { b64 | url } （图片生成）
-testConnection / testImageConnection       → { ok, message }
+testTextService(cfg) / testImageService(cfg) → ServiceTestResult
+ServiceTestResult = { service, success, code, message, status?, endpoint?, model?, durationMs, suggestion? }
 ```
 
 新增一家供应商只需实现对应接口，无需改动业务编排（`electron/enrich.ts`）。
+
+## 错误分类（测试/生成返回结构化结果）
+
+| code | 触发 | 建议 |
+|---|---|---|
+| `ok` | HTTP 2xx 成功 | — |
+| `ai_not_configured` / `ai_no_key` | 未填 URL/模型 / 未填 Key | 到「智能服务设置」填写并保存 |
+| `ai_http` + `400` | 请求参数/模型名有误 | 检查模型名、URL、尺寸 |
+| `ai_http` + `401` | Key 无效/过期 | 重新填写并保存 Key |
+| `ai_http` + `403` | 权限不足 | 核对 Key 是否有该模型权限 |
+| `ai_http` + `404` | 接口/模型不存在 | 确认 URL 以 `/v1` 结尾、模型名正确 |
+| `ai_http` + `429` | 限流/额度用完 | 稍后重试或检查余额 |
+| `ai_http` + `500/502/503/504` | 服务端故障 | 稍后重试 |
+| `ai_dns` | 域名无法解析 | 检查 URL、网络、是否需要代理 |
+| `ai_timeout` | 请求超时 | 网络不稳，稍后重试 |
+| `ai_connect` | 连接被拒绝 | 检查地址/端口，本地服务（Ollama）是否已启动 |
+| `ai_tls` | 证书校验失败 | 核对 HTTPS 地址 |
+| `ai_empty` / `ai_parse` | 空回复 / 非 JSON | 换模型或重试 |
+
+图片测试失败**不会阻塞文本服务**：`测试全部` 并行执行，两栏各自显示结果。
 
 ## 常见错误与提示（验收点 #11 对应）
 
