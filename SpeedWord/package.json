@@ -1,32 +1,61 @@
 {
-  "name": "speedword-classroom",
-  "version": "1.0.0",
-  "description": "极速识词（课堂互动版）— 数字单词卡互动引擎 Windows 桌面版",
+  "name": "speedword-classroom-v4",
+  "version": "4.0.0",
+  "description": "极速识词（课堂互动版）V4 — 面向 Windows 一体机的课堂英语学习游戏工具",
   "author": "SpeedWord",
-  "main": "main.js",
+  "license": "MIT",
+  "main": "electron-dist/electron/main.js",
   "scripts": {
-    "sync:html": "node sync-html.js",
-    "start": "npm run sync:html && electron .",
-    "dist": "npm run sync:html && electron-builder",
-    "dist:win": "npm run sync:html && electron-builder --win"
+    "clean": "node scripts/clean.mjs",
+    "prepare:assets": "node scripts/prepare-assets.mjs",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "build:electron": "tsc -p tsconfig.electron.json && node scripts/after-build.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run prepare:assets && npm run build:electron && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:portable": "npm run build && electron-builder --win portable"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "sql.js": "^1.10.3"
   },
   "devDependencies": {
+    "@types/node": "^20.14.9",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/tsconfig": "^0.5.1",
     "electron": "^31.3.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "pinia": "^2.1.7",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.3",
+    "vitest": "^2.0.2",
+    "vue": "^3.4.31",
+    "vue-tsc": "^2.0.26"
   },
   "build": {
-    "appId": "com.speedword.classroom",
+    "appId": "com.speedword.classroom.v4",
     "productName": "极速识词",
-    "files": [
-      "index.html",
-      "main.js",
-      "preload.js",
-      "sync-html.js",
-      "assets/**/*"
-    ],
+    "asar": true,
     "directories": {
-      "output": "dist"
+      "output": "release"
     },
+    "files": [
+      "electron-dist/**/*",
+      "dist/renderer/**/*",
+      "assets/**/*",
+      "examples/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/dictionary",
+        "to": "dictionary"
+      }
+    ],
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] },
@@ -39,7 +68,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "极速识词"
+      "shortcutName": "极速识词",
+      "artifactName": "极速识词-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "极速识词-Portable-${version}.exe"
     }
   }
 }

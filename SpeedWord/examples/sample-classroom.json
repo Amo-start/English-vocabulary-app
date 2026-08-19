@@ -1,0 +1,28 @@
+// 示例课堂数据（对应 SQLite 表 classroom_sessions / classroom_feedback / review_pool）
+// V4 采用 Session 级班级反馈：不再给单个学生打个人标签。
+// 「重点复习」词条会自动进入本地复习池。
+// 此文件仅作数据结构示例；实际数据保存在 %APPDATA%/极速识词/speedword.db。
+{
+  "sessions": [
+    {
+      "id": "sess-2026-08-19-001",
+      "packId": "sample-pack",
+      "gameMode": "quick-read",
+      "className": "初一(3)班",
+      "startedAt": 1765000000000,
+      "endedAt": 1765002400000,
+      "itemCount": 6,
+      "correctCount": 5,
+      "comboMax": 4,
+      "summary": { "mastered": 5, "partial": 0, "review": 1 }
+    }
+  ],
+  "feedback": [
+    { "id": "fb-1", "sessionId": "sess-2026-08-19-001", "packId": "sample-pack", "itemId": "sample-apple", "signal": "mastered", "responseCount": 42, "correctCount": 40, "notes": "", "createdAt": 1765001200000 },
+    { "id": "fb-2", "sessionId": "sess-2026-08-19-001", "packId": "sample-pack", "itemId": "sample-look-after", "signal": "review", "responseCount": 42, "correctCount": 18, "notes": "动介搭配记不牢", "createdAt": 1765001500000 },
+    { "id": "fb-3", "sessionId": "sess-2026-08-19-001", "packId": "sample-pack", "itemId": "sample-sentence", "signal": "partial", "responseCount": 42, "correctCount": 30, "notes": "", "createdAt": 1765001800000 }
+  ],
+  "reviewPool": [
+    { "id": "rp-1", "packId": "sample-pack", "itemId": "sample-look-after", "reason": "重点复习", "sourceSession": "sess-2026-08-19-001", "lastMode": "quick-read", "createdAt": 1765001500000, "lastPracticed": null }
+  ]
+}

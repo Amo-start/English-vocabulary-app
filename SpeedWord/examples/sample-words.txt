@@ -1,0 +1,14 @@
+# 示例：粘贴到「智能创建」的内容
+# 每行一个单词/词组/句子，系统自动识别类型（word/phrase/phrasal_verb/sentence/expression）
+# 也支持 单词|中文|例句 和 单词\t中文 格式；# 开头为注释，会被忽略
+
+apple
+banana
+protect
+responsibility
+look after
+take care of
+piece of cake
+break the ice
+This is my book.
+Can you help me with my homework?
