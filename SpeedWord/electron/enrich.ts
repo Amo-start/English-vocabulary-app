@@ -46,8 +46,8 @@ interface AiEnrichPayload {
 
 const SYSTEM_PROMPT = `你是经验丰富的初中英语教师，负责把英文词条加工成适合中国学生课堂使用的教学素材。
 规则：
-1. meaningZh：简洁准确的中文解释（一词条一行，含适用语境）。
-2. definitionEn：给初中生看的英文释义，用简单词。
+1. meaningZh：必须极简，2~12个中文字符，只写课堂最常用的1~3个简短释义，用分号分隔。绝对禁止百科式解释、完整句子、外观描述、词源说明。例：苹果（正确） / 苹果，一种常见水果，圆形，味道甜或酸（错误）。
+2. definitionEn：给初中生看的英文释义，用简单词，1~2句话。
 3. example：一个自然、课堂可用的英文例句（配中文对照放 example 即可，格式 "英文. 中文。"）。
 4. memoryHint：帮助学生记忆的提示（联想/词根/谐音，中文）。
 5. imageSceneDescription：一段纯英文的场景描述，用于生成"教学情境插画"。
@@ -135,7 +135,8 @@ async function enrichOne(
     errors.push({ stage: "dictionary", message: (e as Error).message });
   }
   if (dict) {
-    if (dict.phonetic) {
+    // V4.3: 只有 word 类型才接受音标，避免词组/句子出现错误音标
+    if (dict.phonetic && itemType === "word") {
       item.phonetic = dict.phonetic;
       source.phonetic = dict.source === "builtin" ? "builtin" : "dict-api";
     }
@@ -286,7 +287,7 @@ export async function enrichItems(db: Db, items: EnrichRequestItem[], opts: Enri
 export async function regenerateField(
   db: Db,
   item: ContentItem,
-  field: "meaningZh" | "example" | "definitionEn" | "memoryHint" | "image"
+  field: "meaningZh" | "example" | "definitionEn" | "memoryHint" | "image" | "phonetic"
 ): Promise<Partial<ContentItem>> {
   const cfg = await collectResolvedCfg(db);
   if (!cfg.text.enabled) throw new AiError("ai_not_configured", "AI 文本服务未配置");
@@ -318,6 +319,12 @@ export async function regenerateField(
   else if (field === "definitionEn") patch.definitionEn = ai.definitionEn;
   else if (field === "example") patch.example = ai.example;
   else if (field === "memoryHint") patch.aiMeta = { ...item.aiMeta, memoryHint: ai.memoryHint };
+  else if (field === "phonetic") {
+    // V4.3: 非单词类型不生成音标
+    if (item.type === "word") {
+      patch.phonetic = ""; // AI 不直接生成音标，留空由词典链路补充
+    }
+  }
   return patch;
 }
 

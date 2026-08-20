@@ -76,7 +76,19 @@ export const usePacksStore = defineStore("packs", () => {
 
   async function saveItem(item: ContentItem): Promise<ContentItem> {
     item.updatedAt = now();
-    const saved = await window.api.itemSave(item);
+    // V4.3: 转 plain DTO，避免 Vue reactive proxy 触发 DataCloneError
+    const plain: ContentItem = {
+      id: item.id, packId: item.packId, sort: item.sort, type: item.type,
+      text: item.text, phonetic: item.phonetic, partOfSpeech: item.partOfSpeech,
+      meaningZh: item.meaningZh, definitionEn: item.definitionEn, example: item.example,
+      audio: { ...item.audio },
+      image: { ...item.image, history: item.image.history || [] },
+      aiMeta: { ...item.aiMeta },
+      fieldState: { ...item.fieldState },
+      verified: item.verified, locked: item.locked,
+      createdAt: item.createdAt, updatedAt: item.updatedAt
+    };
+    const saved = await window.api.itemSave(plain);
     const idx = items.value.findIndex((i) => i.id === item.id);
     if (idx >= 0) items.value[idx] = saved || item;
     else items.value.push(saved || item);
@@ -119,7 +131,19 @@ export const usePacksStore = defineStore("packs", () => {
     }));
     // 合并后本地数组先更新（乐观 UI），再落库
     items.value = [...existing, ...prepared];
-    const res = await window.api.itemsReplaceAll(packId, items.value);
+    // V4.3: 转 plain DTO 数组，避免 Vue reactive proxy 触发 DataCloneError
+    const plainItems: ContentItem[] = items.value.map((it) => ({
+      id: it.id, packId: it.packId, sort: it.sort, type: it.type,
+      text: it.text, phonetic: it.phonetic, partOfSpeech: it.partOfSpeech,
+      meaningZh: it.meaningZh, definitionEn: it.definitionEn, example: it.example,
+      audio: { ...it.audio },
+      image: { ...it.image, history: it.image.history || [] },
+      aiMeta: { ...it.aiMeta },
+      fieldState: { ...it.fieldState },
+      verified: it.verified, locked: it.locked,
+      createdAt: it.createdAt, updatedAt: it.updatedAt
+    }));
+    const res = await window.api.itemsReplaceAll(packId, plainItems);
     if (res && res.count !== undefined && res.count !== items.value.length) {
       throw new Error(`保存数量不匹配：期望 ${items.value.length}，实际 ${res.count}`);
     }

@@ -47,7 +47,11 @@ async function generate(): Promise<void> {
   if (!settings.isImageAvailable()) { ui.toast("AI 图片服务未配置", "warn"); return; }
   generating.value = true;
   try {
-    const res = await window.api.aiRegenImageByDescription(props.item!, desc.value.trim());
+    // V4.3: 只传 contentId，避免 Vue reactive proxy 触发 DataCloneError
+    const res = await window.api.aiRegenImageByDescription({
+      contentId: props.item!.id,
+      description: desc.value.trim()
+    });
     emit("apply", { localPath: res.localPath, sourceType: "ai", description: desc.value.trim(), sourceUrl: res.sourceUrl });
   } catch (e) {
     ui.toast(`生成失败：${(e as Error).message}`, "error");

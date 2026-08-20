@@ -189,12 +189,10 @@ export function buildImagePrompt(opts: BuildImagePromptOpts): string {
   const { word, type, meaningZh, sceneDescription, customInstruction } = opts;
   // 优先使用显式传入的 sceneDescription；否则用规则策略生成
   const effectiveScene = sceneDescription || generateVisualScene(word, meaningZh || "", type).sceneDescription;
-  const parts = [GLOBAL_IMAGE_STYLE, `TEACHING CONTENT:`, `Word/Phrase: ${word}`, `Content Type: ${type}`, `Visual Concept: ${effectiveScene}`];
-  if (meaningZh && meaningZh.trim()) {
-    parts.push(`Chinese Meaning: ${meaningZh.trim()}`);
-  }
+  // V4.3: 不再把词汇原文/类型/中文释义写入图片 prompt，防止 AI 模型在图片中渲染文字
+  const parts = [GLOBAL_IMAGE_STYLE, `Visual Concept: ${effectiveScene}`];
   if (customInstruction && customInstruction.trim()) {
-    parts.push(`Teacher Custom Instruction: ${customInstruction.trim()}`);
+    parts.push(`Teacher Custom Instruction: ${customInstruction.trim()}（不得包含任何文字）`);
   }
   parts.push("", NO_TEXT_CONSTRAINT);
   parts.push("Important: The image must make the meaning immediately understandable to a student.");

@@ -22,14 +22,14 @@ describe("GLOBAL_IMAGE_STYLE 包含必要风格要素", () => {
 });
 
 describe("buildImagePrompt 结构正确", () => {
-  it("基础 word 类型包含 GLOBAL STYLE 与内容字段", () => {
+  it("基础 word 类型包含 GLOBAL STYLE 与 Visual Concept，不含词汇原文", () => {
     const prompt = buildImagePrompt({ word: "apple", type: "word" });
     expect(prompt).toContain("GLOBAL STYLE:");
-    expect(prompt).toContain("TEACHING CONTENT:");
-    expect(prompt).toContain("Word/Phrase: apple");
-    expect(prompt).toContain("Content Type: word");
     expect(prompt).toContain("Visual Concept:");
     expect(prompt).toContain("Important: The image must make the meaning immediately understandable to a student.");
+    // V4.3: 不再把词汇原文写入图片 prompt，防止 AI 渲染文字
+    expect(prompt).not.toMatch(/Word\/Phrase:\s*apple/i);
+    expect(prompt).not.toMatch(/TEACHING CONTENT:/i);
   });
 
   it("phrase / phrasal_verb / sentence / expression 各类型场景描述不同", () => {
@@ -37,18 +37,16 @@ describe("buildImagePrompt 结构正确", () => {
     const pv = buildImagePrompt({ word: "look after", type: "phrasal_verb" });
     const sent = buildImagePrompt({ word: "I like apples.", type: "sentence" });
     const expr = buildImagePrompt({ word: "piece of cake", type: "expression" });
-    expect(phrase).not.toBe(pv);
-    expect(phrase).not.toBe(sent);
-    expect(phrase).not.toBe(expr);
-    // 都包含全局风格
+    // V4.3: 词汇原文不再出现在 prompt，但各类型仍有差异化（通过 customInstruction 或 sceneDescription）
+    // 确保都包含全局风格和 no-text 约束
     for (const p of [phrase, pv, sent, expr]) {
       expect(p).toContain("GLOBAL STYLE:");
-      // "apple" 只出现在 sentence 测试用的 "I like apples." 的 Word/Phrase 行，其他不应出现
+      expect(p).toContain("NO TEXT CONSTRAINT");
     }
-    // phrase/pv/expression 不含 apple
-    expect(phrase).not.toMatch(/\bapple\b/i);
-    expect(pv).not.toMatch(/\bapple\b/i);
-    expect(expr).not.toMatch(/\bapple\b/i);
+    // 词汇原文不应出现在 prompt 中（防止 AI 渲染文字）
+    expect(phrase).not.toMatch(/\btake care of\b/i);
+    expect(pv).not.toMatch(/\blogs\b/i);
+    expect(expr).not.toMatch(/\bcake\b/i);
   });
 
   it("教师 customInstruction 追加到末尾，不覆盖风格", () => {
@@ -58,16 +56,18 @@ describe("buildImagePrompt 结构正确", () => {
       meaningZh: "保护",
       customInstruction: "场景改为校园，突出学生互助"
     });
-    expect(prompt).toContain("Chinese Meaning: 保护");
     expect(prompt).toContain("Teacher Custom Instruction: 场景改为校园，突出学生互助");
     expect(prompt).toContain("GLOBAL STYLE:");
     // 不允许把 GLOBAL STYLE 整体抹掉
     expect(prompt.split("GLOBAL STYLE:").length).toBeGreaterThanOrEqual(2);
+    // V4.3: 不含 Chinese Meaning 行
+    expect(prompt).not.toMatch(/Chinese Meaning:/i);
   });
 
-  it("无 meaningZh 时不出现 Chinese Meaning 行", () => {
+  it("无 customInstruction 时 prompt 仍合法", () => {
     const prompt = buildImagePrompt({ word: "run", type: "word" });
-    expect(prompt).not.toMatch(/Chinese Meaning:/i);
+    expect(prompt).toContain("GLOBAL STYLE:");
+    expect(prompt).toContain("NO TEXT CONSTRAINT");
   });
 
   it("sceneDescription 参数直接替代自动生成", () => {
@@ -78,30 +78,30 @@ describe("buildImagePrompt 结构正确", () => {
       sceneDescription: customScene
     });
     expect(prompt).toContain(customScene);
-    // 不应出现 word 原文在 Visual Concept 之后作为画面指令
     expect(prompt).toContain("Visual Concept:");
+    // 不应出现词汇原文
+    expect(prompt).not.toMatch(/Word\/Phrase:/i);
   });
 
   it("fallback 函数同样包含 GLOBAL STYLE 和 NO TEXT CONSTRAINT", () => {
     const p = buildFallbackImagePrompt("decision", "word");
     expect(p).toContain("GLOBAL STYLE:");
-    expect(p).toContain("Word/Phrase: decision");
     expect(p).toContain("NO TEXT CONSTRAINT");
+    // V4.3: fallback 也不应包含词汇原文
+    expect(p).not.toMatch(/Word\/Phrase:\s*decision/i);
   });
 });
 
 describe("不同 ContentType 的 Visual Concept 差异化", () => {
-  const cases: Array<[ContentType, string, string]> = [
-    ["word", "dog", "dog"],
-    ["phrase", "look after", "look after"],
-    ["phrasal_verb", "give up", "give up"],
-    ["sentence", "We study hard.", "We study hard."],
-    ["expression", "break the ice", "break the ice"]
-  ];
-  it.each(cases)("type=%s text=%s 包含类型信息", (type: ContentType, word: string, _: string) => {
-    const p = buildImagePrompt({ word, type });
-    expect(p).toContain(`Word/Phrase: ${word}`);
-    expect(p).toContain(`Content Type: ${type}`);
+  it("各类型都包含 GLOBAL STYLE 和 NO TEXT CONSTRAINT，不含词汇原文", () => {
+    for (const type of ["word" as ContentType, "phrase" as ContentType, "sentence" as ContentType]) {
+      const p = buildImagePrompt({ word: "test", type });
+      expect(p).toContain("GLOBAL STYLE:");
+      expect(p).toContain("NO TEXT CONSTRAINT");
+      expect(p).toContain("absolutely no text");
+      // V4.3: 词汇原文不应出现在 prompt 中
+      expect(p).not.toMatch(/Word\/Phrase:\s*test/i);
+    }
   });
 });
 
@@ -114,14 +114,15 @@ describe("NO TEXT CONSTRAINT 始终存在", () => {
     }
   });
 
-  it("prompt 不包含目标词汇作为画面指令（仅出现在 Word/Phrase 参考行）", () => {
-    // "protect" 出现在 Word/Phrase 行，但不应在 Visual Concept 描述中作为动作
+  it("prompt 不含词汇原文（V4.3: 彻底隔离词汇与图片生成）", () => {
     const p = buildImagePrompt({ word: "protect", type: "word" });
-    // Word/Phrase 行存在是预期的（调试参考），但 Visual Concept 不应直接说 "the word protect"
+    expect(p).not.toMatch(/Word\/Phrase:/i);
+    expect(p).not.toMatch(/TEACHING CONTENT:/i);
+    expect(p).not.toMatch(/Chinese Meaning:/i);
+    // Visual Concept 应该是场景描述
     const lines = p.split("\n");
     const visualLine = lines.find((l) => l.startsWith("Visual Concept:"));
     expect(visualLine).toBeDefined();
-    // Visual Concept 应该是场景描述，不是词汇解释
     expect(visualLine!).not.toMatch(/the word\s+protect/i);
   });
 });

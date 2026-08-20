@@ -148,7 +148,7 @@ export const useClassroomStore = defineStore("classroom", () => {
 
   /**
    * 结束课堂：落盘 Session 汇总 + 复习池。
-   * V4.2: 幂等 — 已结束时不重复保存。
+   * V4.4: 幂等 + 异常保护 — finish() 失败时不抛错，界面仍可返回。
    */
   async function finish(): Promise<void> {
     if (!session.value || !running.value) return;
@@ -170,7 +170,11 @@ export const useClassroomStore = defineStore("classroom", () => {
       comboMax: comboMax.value,
       feedbackCounts: countFeedback()
     };
-    await window.api.sessionUpdate(session.value);
+    try {
+      await window.api.sessionUpdate({ ...session.value });
+    } catch (e) {
+      console.warn("[classroom] sessionUpdate 失败，忽略:", e);
+    }
     running.value = false;
   }
 
@@ -182,7 +186,7 @@ export const useClassroomStore = defineStore("classroom", () => {
 
   /**
    * 退出课堂（不完成统计时）。
-   * V4.2: 幂等 — 已退出时直接返回；清理所有状态。
+   * V4.4: 幂等 + 异常保护 — abort() 内部失败不抛错，确保 modal/exiting 始终可恢复。
    */
   async function abort(): Promise<void> {
     // 幂等：已经在 IDLE 或非 running 状态，直接返回
@@ -200,7 +204,11 @@ export const useClassroomStore = defineStore("classroom", () => {
     }
     if (session.value) {
       session.value.endedAt = now();
-      await window.api.sessionUpdate(session.value);
+      try {
+        await window.api.sessionUpdate({ ...session.value });
+      } catch (e) {
+        console.warn("[classroom] sessionUpdate 失败，忽略:", e);
+      }
     }
     running.value = false;
     machine.value = createMachine(0);

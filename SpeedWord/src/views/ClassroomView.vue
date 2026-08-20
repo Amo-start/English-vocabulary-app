@@ -55,6 +55,9 @@ const showFeedback = computed(() =>
 // V4.2: 进度安全显示：禁止超过 total
 const displayIndex = computed(() => Math.min(index.value, total.value));
 
+// V4.4: 是否处于最后一题（用于隐藏"下一题"按钮）
+const isLastQuestion = computed(() => index.value >= total.value);
+
 const feedbackItems: Array<{ signal: FeedbackSignal; label: string; emoji: string }> = [
   { signal: "mastered", label: "全班掌握", emoji: "✅" },
   { signal: "partial", label: "部分加强", emoji: "🙂" },
@@ -123,7 +126,10 @@ function optClass(i: number): Record<string, boolean> {
 
 // ---------- 切题：必须经 QUESTION_TRANSITIONING，动画结束才 NEXT_DONE ----------
 async function advance(): Promise<void> {
-  if (busy.value || modalOpen.value) return;
+  if (modalOpen.value) return;
+  // V4.4: 防止在最后一题之后仍然尝试推进
+  const isLast = classroom.machine.index >= classroom.machine.total;
+  if (isLast) return;
   if (!classroom.act("FEEDBACK")) return;          // → FEEDBACK
   if (!classroom.act("NEXT")) return;              // → QUESTION_TRANSITIONING
   classroom.lock("transition");                    // 动画期间拒绝任何快速点击
@@ -138,8 +144,12 @@ async function advance(): Promise<void> {
       finished.value = true;
       stopSpeak();
     }
-  } catch {
+  } catch (e) {
+    console.warn("[advance] error:", e);
     classroom.unlock();
+    // 异常时强制进入完成态，避免界面卡死
+    finished.value = true;
+    stopSpeak();
   }
 }
 
@@ -177,7 +187,7 @@ function goPrev(): void {
   }
 }
 
-// ---------- 退出 / 完成（V4.2 完整修复） ----------
+// ---------- 退出 / 完成（V4.4 完整修复） ----------
 async function exitClassroom(): Promise<void> {
   if (exiting.value || modalOpen.value) return;
   exiting.value = true;
@@ -197,18 +207,24 @@ async function exitClassroom(): Promise<void> {
     cancelText: "取消",
     danger: true
   });
-  if (ok) {
-    // 幂等清理
-    await classroom.abort();
-    finished.value = false;
-    choicePicked.value = null;
-    ui.go("game-center");
-  } else {
-    // 用户取消：关闭 modal，恢复游戏
-    finished.value = false;
+  try {
+    if (ok) {
+      // V4.4: abort() 内部已做异常保护，不会抛错
+      await classroom.abort();
+      finished.value = false;
+      choicePicked.value = null;
+      ui.go("game-center");
+    } else {
+      // 用户取消：关闭 modal，恢复游戏
+      finished.value = false;
+    }
+  } catch (e) {
+    console.warn("[exitClassroom] error:", e);
+  } finally {
+    // 无论成功/失败/取消，都必须恢复 modal 和 exiting 状态
+    exiting.value = false;
+    modalOpen.value = false;
   }
-  exiting.value = false;
-  modalOpen.value = false;
 }
 
 // V4.2: ESC 打开 modal 后不再重复触发 exit
@@ -254,9 +270,9 @@ function onKey(e: KeyboardEvent): void {
     case " ":
     case "Enter":
       e.preventDefault();
-      if (isChoice.value) { if (choicePicked.value) void handleNext(); }
+      if (isChoice.value) { if (choicePicked.value && !isLastQuestion.value) void handleNext(); }
       else if (canReveal.value) void reveal();
-      else if (phase.value === "ANSWER_VISIBLE") void handleNext();
+      else if (phase.value === "ANSWER_VISIBLE" && !isLastQuestion.value) void handleNext();
       break;
     case "Escape":
       e.preventDefault();
@@ -265,7 +281,7 @@ function onKey(e: KeyboardEvent): void {
     case "ArrowRight":
       e.preventDefault();
       if (!isChoice.value && canReveal.value) void reveal();
-      else if (phase.value === "ANSWER_VISIBLE") void handleNext();
+      else if (phase.value === "ANSWER_VISIBLE" && !isLastQuestion.value) void handleNext();
       break;
     case "ArrowLeft":
       e.preventDefault();
@@ -349,7 +365,7 @@ onBeforeUnmount(() => {
             <div v-else-if="q.kind === 'flash'" class="prompt">
               <img v-if="q.promptImage" :src="q.promptImage" class="prompt-img" alt="" />
               <div class="prompt-text">{{ q.promptText }}</div>
-              <div v-if="q.showPhonetic && q.item.phonetic" class="phonetic">/{{ q.item.phonetic }}/</div>
+              <div v-if="q.showPhonetic && q.item.type === 'word' && q.item.phonetic" class="phonetic">/{{ q.item.phonetic }}/</div>
             </div>
             <!-- 选项题（含教学化题干） -->
             <div v-if="q.kind === 'choice'" class="options">
@@ -371,7 +387,7 @@ onBeforeUnmount(() => {
             <div v-if="isRevealed" ref="answerRef" class="answer">
               <div class="answer-word" @click="playWord">{{ q.item.text }} <span class="spk">🔊</span></div>
               <div class="answer-meta">
-                <span v-if="q.item.phonetic" class="phonetic">/{{ q.item.phonetic }}/</span>
+                <span v-if="q.item.type === 'word' && q.item.phonetic" class="phonetic">/{{ q.item.phonetic }}/</span>
                 <span v-if="q.item.partOfSpeech" class="pos">{{ q.item.partOfSpeech }}</span>
               </div>
               <div v-if="q.item.meaningZh" class="answer-meaning">{{ q.item.meaningZh }}</div>
@@ -401,7 +417,7 @@ onBeforeUnmount(() => {
             <span class="fb-label">{{ f.label }}</span>
             <kbd>{{ fi + 1 }}</kbd>
           </button>
-          <button class="fb-next" @click="handleNext" title="跳过反馈，下一题">
+          <button v-if="!isLastQuestion" class="fb-next" @click="handleNext" title="跳过反馈，下一题">
             <span class="fb-emoji">▶</span>
             <span class="fb-label">下一题</span>
             <kbd>Space</kbd>

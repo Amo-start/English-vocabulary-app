@@ -34,6 +34,17 @@ async function load(): Promise<void> {
 
 function selectItem(id: string): void { selectedId.value = id; }
 
+// V4.3: 类型切换时，非单词清除音标
+function onTypeChange(): void {
+  const item = selected.value;
+  if (!item) return;
+  if (item.type !== "word") {
+    item.phonetic = "";
+    item.partOfSpeech = "";
+  }
+  void save(item);
+}
+
 function fieldChip(fs: ContentItem["fieldState"], f: EditableField): string {
   return fieldStateLabel(fs[f]);
 }
@@ -61,9 +72,18 @@ async function regenField(item: ContentItem, field: EditableField | "memoryHint"
   if (field !== "memoryHint" && item.fieldState[field] === "locked") { ui.toast("该字段已锁定，请先解锁再重新生成", "warn"); return; }
   busyOne.value = true;
   try {
-    const patch = await window.api.aiRegenField(item, field);
+    // V4.3: 只传 plain DTO（contentId + text + type + field），避免 Vue reactive proxy 触发 DataCloneError
+    const patch = await window.api.aiRegenField({
+      contentId: item.id,
+      field,
+      customInstruction: field === "image" ? (item.image.description || "") : undefined
+    });
     const merged = { ...item, ...patch };
     if (field !== "memoryHint") merged.fieldState = markEdited(item.fieldState, field);
+    // V4.3: 非单词类型清除音标
+    if (field === "phonetic" && item.type !== "word") {
+      merged.phonetic = "";
+    }
     await packs.saveItem(merged);
     ui.toast("已重新生成", "success");
   } catch (e) {
@@ -195,7 +215,7 @@ onMounted(load);
             style="flex: 2; min-width: 200px; font-weight: 700"
             @input="selected.text = ($event.target as HTMLInputElement).value; selected.type = detectContentType(selected.text); onFieldInput(selected, 'phonetic')"
           />
-          <select v-model="selected.type" style="flex: 1; min-width: 120px" @change="save(selected)">
+          <select v-model="selected.type" style="flex: 1; min-width: 120px" @change="onTypeChange">
             <option v-for="t in TYPES" :key="t" :value="t">{{ typeLabel(t) }}</option>
           </select>
           <button class="btn btn-primary" :disabled="busyAll" @click="regenAll(selected)">

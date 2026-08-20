@@ -44,8 +44,8 @@ const api: SpeedWordApi = {
   aiLookupDict: (text: string) => ipcRenderer.invoke("ai:lookupDict", text),
   aiEnrichItems: (texts: Array<{ text: string; type?: string }>, opts?: { offlineOnly?: boolean }) =>
     ipcRenderer.invoke("ai:enrichItems", texts, opts),
-  aiRegenField: (item: unknown, field: string) => ipcRenderer.invoke("ai:regenField", item, field),
-  aiRegenImageByDescription: (item: unknown, description: string) => ipcRenderer.invoke("ai:regenImageByDescription", item, description),
+  aiRegenField: (params: { contentId: string; field: string; customInstruction?: string }) => ipcRenderer.invoke("ai:regenField", params),
+  aiRegenImageByDescription: (params: { contentId: string; description: string }) => ipcRenderer.invoke("ai:regenImageByDescription", params),
   // contentId-only 重新生成（避免 DataCloneError）
   imageRegenerate: (params: { contentId: string; customInstruction?: string }) => ipcRenderer.invoke("image:regenerate", params),
   // 图片

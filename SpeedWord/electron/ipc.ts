@@ -233,11 +233,23 @@ export function registerIpc(db: Db): void {
     });
     return results;
   });
-  ipcMain.handle("ai:regenField", async (_e, item: ContentItem, field: string) => {
+  ipcMain.handle("ai:regenField", async (_e, params: { contentId: string; field: string; customInstruction?: string }) => {
+    const { contentId, field, customInstruction } = params || {};
+    if (!contentId) throw new Error("缺少 contentId");
+    const item = itemGet(db.db, String(contentId));
+    if (!item) throw new Error(`词条不存在：${contentId}`);
+    // V4.3: 非单词类型不生成音标
     const patch = await regenerateField(db, item, field as never);
+    if (field === "phonetic" && item.type !== "word") {
+      (patch as Partial<ContentItem>).phonetic = "";
+    }
     return patch;
   });
-  ipcMain.handle("ai:regenImageByDescription", async (_e, item: ContentItem, description: string) => {
+  ipcMain.handle("ai:regenImageByDescription", async (_e, params: { contentId: string; description: string }) => {
+    const { contentId, description } = params || {};
+    if (!contentId) throw new Error("缺少 contentId");
+    const item = itemGet(db.db, String(contentId));
+    if (!item) throw new Error(`词条不存在：${contentId}`);
     const cfg = await collectResolvedCfg(db);
     if (!cfg.image.enabled) throw new Error("AI 图片服务未配置");
     const prompt = description || buildFallbackImagePrompt(item.text, item.type);

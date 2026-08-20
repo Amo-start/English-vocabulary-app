@@ -129,8 +129,8 @@ export interface SpeedWordApi {
   aiTest(): Promise<{ text: { ok: boolean; message: string }; image: { ok: boolean; message: string } }>;
   aiLookupDict(text: string): Promise<unknown>;
   aiEnrichItems(texts: EnrichRequestItem[], opts?: { offlineOnly?: boolean }): Promise<EnrichResult[]>;
-  aiRegenField(item: ContentItem, field: string): Promise<Partial<ContentItem>>;
-  aiRegenImageByDescription(item: ContentItem, description: string): Promise<AppliedImage>;
+  aiRegenField(params: { contentId: string; field: string; customInstruction?: string }): Promise<Partial<ContentItem>>;
+  aiRegenImageByDescription(params: { contentId: string; description: string }): Promise<AppliedImage>;
   /** contentId-only 重新生成图片（避免传整个词条对象触发 DataCloneError） */
   imageRegenerate(params: { contentId: string; customInstruction?: string }): Promise<AppliedImage>;
   // 图片
