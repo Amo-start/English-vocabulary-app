@@ -34,41 +34,41 @@ describe("课堂状态机", () => {
     expect(m.index).toBe(2);
   });
 
-  it("最后一题后 FINISHED（index=total 时 NEXT_DONE 触发）", () => {
+  it("最后一题后 FINISHED（index=total+1 时 NEXT_DONE 触发）", () => {
     let m = transition(createMachine(1), "START").machine;      // index=1, total=1
     m = transition(m, "REVEAL").machine;                        // ANSWER_REVEALING
     m = transition(m, "REVEAL_DONE").machine;                   // ANSWER_VISIBLE
     m = requestNext(m).machine;                                 // QUESTION_TRANSITIONING, index=2
     expect(m.phase).toBe("QUESTION_TRANSITIONING");
     m = transition(m, "NEXT_DONE").machine;
-    // V4.2: index(2) >= total(1) → FINISHED
+    // V4.6: index(2) > total(1) → FINISHED
     expect(m.phase).toBe("FINISHED");
   });
 
   it("20题完整流程：第20题后结束", () => {
     let m = transition(createMachine(20), "START").machine; // index=1, QUESTION_READY
-    // 模拟18次完整流程（第1~18题），NEXT_DONE 后 index=19
-    // 注意：NEXT_DONE 检查 m.index >= m.total，当 index=20 时就会触发 FINISHED
-    for (let i = 0; i < 18; i++) {
+    // 模拟19次完整流程（第1~19题），NEXT_DONE 后 index=20
+    // V4.6: NEXT_DONE 用 > 而非 >=，确保最后一题(index=total)能进入 QUESTION_READY 展示
+    for (let i = 0; i < 19; i++) {
       expect(m.phase).toBe("QUESTION_READY");
       m = transition(m, "REVEAL").machine;                   // ANSWER_REVEALING
       m = transition(m, "REVEAL_DONE").machine;              // ANSWER_VISIBLE
       m = transition(m, "FEEDBACK").machine;                 // FEEDBACK
       m = requestNext(m).machine;                            // QUESTION_TRANSITIONING, index++
-      m = transition(m, "NEXT_DONE").machine;                // QUESTION_READY
-      expect(m.index).toBe(i + 2);                           // 1→2, 2→3, ..., 17→19
+      m = transition(m, "NEXT_DONE").machine;                // QUESTION_READY（index <= total）
+      expect(m.index).toBe(i + 2);                           // 1→2, 2→3, ..., 18→20
     }
-    // 现在 index=19, QUESTION_READY（第19题）
-    expect(m.index).toBe(19);
+    // 现在 index=20, QUESTION_READY（第20题）
+    expect(m.index).toBe(20);
     expect(m.phase).toBe("QUESTION_READY");
-    // 第19题完成 → NEXT（index=20）→ NEXT_DONE（20 >= 20 → FINISHED）
+    // 第20题完成 → NEXT（index=21）→ NEXT_DONE（21 > 20 → FINISHED）
     m = transition(m, "REVEAL").machine;
     m = transition(m, "REVEAL_DONE").machine;
     m = transition(m, "FEEDBACK").machine;
-    m = requestNext(m).machine;                              // index=20
+    m = requestNext(m).machine;                              // index=21
     m = transition(m, "NEXT_DONE").machine;
     expect(m.phase).toBe("FINISHED");
-    expect(m.index).toBe(20);
+    expect(m.index).toBe(21);
   });
 
   it("非法转移被拒绝（快速连点保护）", () => {
@@ -121,7 +121,7 @@ describe("课堂状态机", () => {
     expect(LOCK_TIMEOUT_MS).toBeLessThan(1000);
   });
 
-  it("NEXT_DONE 边界：index > total 也触发 FINISHED", () => {
+  it("NEXT_DONE 边界：index > total 触发 FINISHED", () => {
     let m = transition(createMachine(1), "START").machine;
     m = transition(m, "FEEDBACK").machine;
     m = requestNext(m).machine; // index=2, total=1

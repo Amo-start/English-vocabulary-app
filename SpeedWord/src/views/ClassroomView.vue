@@ -127,9 +127,6 @@ function optClass(i: number): Record<string, boolean> {
 // ---------- 切题：必须经 QUESTION_TRANSITIONING，动画结束才 NEXT_DONE ----------
 async function advance(): Promise<void> {
   if (modalOpen.value) return;
-  // V4.4: 防止在最后一题之后仍然尝试推进
-  const isLast = classroom.machine.index >= classroom.machine.total;
-  if (isLast) return;
   if (!classroom.act("FEEDBACK")) return;          // → FEEDBACK
   if (!classroom.act("NEXT")) return;              // → QUESTION_TRANSITIONING
   classroom.lock("transition");                    // 动画期间拒绝任何快速点击
@@ -139,7 +136,9 @@ async function advance(): Promise<void> {
     classroom.unlock();
     const r = classroom.act("NEXT_DONE");          // → QUESTION_READY 或 FINISHED
     choicePicked.value = null;
-    if (r && phase.value === "FINISHED") {
+    // V4.7: 双重结算检查 — 既检查 phase 也检查 index 是否越界，防止意外状态导致不结算
+    const shouldFinish = r && (phase.value === "FINISHED" || classroom.machine.index > classroom.machine.total);
+    if (shouldFinish) {
       await classroom.finish();
       finished.value = true;
       stopSpeak();

@@ -81,8 +81,8 @@ export function transition(
       next.index = m.index + 1;
       break;
     case "NEXT_DONE":
-      // V4.2: 用 >= 确保边界安全，避免 index == total 时的遗漏
-      if (m.index >= m.total) {
+      // V4.6: 用 > 而非 >= —— NEXT 后 index 是"下一题序号"，index == total 说明还有最后一题要展示
+      if (m.index > m.total) {
         next.phase = "FINISHED";
       } else {
         next.phase = "QUESTION_READY";

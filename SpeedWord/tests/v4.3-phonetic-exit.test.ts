@@ -94,11 +94,83 @@ describe("状态机退出链路（V4.3 回归）", () => {
     m = transition(m, "REVEAL_DONE").machine;
     m = transition(m, "FEEDBACK").machine;
     m = requestNext(m).machine; // index=2, total=1
-    m = transition(m, "NEXT_DONE").machine; // FINISHED
+    m = transition(m, "NEXT_DONE").machine; // 2 > 1 → FINISHED
     expect(m.phase).toBe("FINISHED");
     const r = transition(m, "EXIT");
     expect(r.ok).toBe(true);
     expect(r.machine.phase).toBe("IDLE");
+  });
+});
+
+// V4.6: NEXT_DONE 改用 > 修复 off-by-one — 最后一题不再被跳过
+describe("边界修正：N题词包全部展示（V4.6）", () => {
+  it("6题词包：第5题切题应进入第6题（QUESTION_READY），而非直接 FINISHED", () => {
+    let m = transition(createMachine(6), "START").machine; // index=1
+    expect(m.index).toBe(1);
+    expect(m.phase).toBe("QUESTION_READY");
+
+    // 走5轮：第1→2→3→4→5题，每轮 FEEDBACK → NEXT → NEXT_DONE
+    for (let round = 0; round < 5; round++) {
+      m = transition(m, "FEEDBACK").machine;
+      m = requestNext(m).machine; // index 从 round+1 变成 round+2
+      m = transition(m, "NEXT_DONE").machine;
+      expect(m.phase).toBe("QUESTION_READY", `第${round + 1}轮后应进入QUESTION_READY`);
+      expect(m.index).toBe(round + 2, `第${round + 1}轮后index应为${round + 2}`);
+    }
+    // 此时 index=6, phase=QUESTION_READY — 正在展示第6题
+    expect(m.index).toBe(6);
+    expect(m.phase).toBe("QUESTION_READY");
+  });
+
+  it("6题词包：第6题切题后应进入 FINISHED", () => {
+    let m = transition(createMachine(6), "START").machine;
+    // 走5轮到第6题
+    for (let round = 0; round < 5; round++) {
+      m = transition(m, "FEEDBACK").machine;
+      m = requestNext(m).machine;
+      m = transition(m, "NEXT_DONE").machine;
+    }
+    expect(m.index).toBe(6);
+    expect(m.phase).toBe("QUESTION_READY");
+
+    // 第6题：反馈 → 下一题
+    m = transition(m, "FEEDBACK").machine;
+    m = requestNext(m).machine; // index=7
+    m = transition(m, "NEXT_DONE").machine; // 7 > 6 → FINISHED
+    expect(m.phase).toBe("FINISHED");
+    expect(m.index).toBe(7);
+  });
+
+  it("单题词包：第1题切题后应直接进入 FINISHED", () => {
+    let m = transition(createMachine(1), "START").machine;
+    expect(m.index).toBe(1);
+    expect(m.phase).toBe("QUESTION_READY");
+
+    m = transition(m, "FEEDBACK").machine;
+    m = requestNext(m).machine; // index=2
+    m = transition(m, "NEXT_DONE").machine; // 2 > 1 → FINISHED
+    expect(m.phase).toBe("FINISHED");
+  });
+
+  it("10题词包：完整走一遍，每道题都能展示", () => {
+    let m = transition(createMachine(10), "START").machine;
+    // 前9轮：每轮结束应进入 QUESTION_READY
+    for (let round = 0; round < 9; round++) {
+      m = transition(m, "FEEDBACK").machine;
+      m = requestNext(m).machine;
+      m = transition(m, "NEXT_DONE").machine;
+      expect(m.phase).toBe("QUESTION_READY");
+      expect(m.index).toBe(round + 2);
+    }
+    // 第10题展示（index=10）
+    expect(m.index).toBe(10);
+    expect(m.phase).toBe("QUESTION_READY");
+
+    // 第10题切题 → FINISHED
+    m = transition(m, "FEEDBACK").machine;
+    m = requestNext(m).machine; // index=11
+    m = transition(m, "NEXT_DONE").machine; // 11 > 10 → FINISHED
+    expect(m.phase).toBe("FINISHED");
   });
 });
 
