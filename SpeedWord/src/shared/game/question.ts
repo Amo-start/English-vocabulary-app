@@ -1,5 +1,8 @@
 // 游戏题目统一结构 + 各玩法题目生成。
-// 渲染端按 question.kind 渲染；生成逻辑纯函数，可测试。
+// V4.2 修复：
+//   1. 选项题增加 questionText（教学化题干），与 prompt 分离
+//   2. 答案渲染仅在 ANSWER_VISIBLE 之后显示（DOM 不提前存在）
+//   3. 情境猜词增加 "请根据场景猜词" 提示语
 import type { ContentItem, GameMode } from "../types";
 import { buildChoiceQuestion, buildContextPrompt, pickDistractors } from "./queue";
 
@@ -14,8 +17,10 @@ export interface ClassroomQuestion {
   kind: QuestionKind;
   mode: GameMode;
   item: ContentItem;
-  /** 主线索文本 */
+  /** 主线索文本（英文原文或中文释义） */
   promptText: string;
+  /** 教学化题干（选择题专用，用于显示问题） */
+  questionText?: string;
   /** 图片（本地路径或 sw:// url） */
   promptImage?: string;
   /** 选项题 */
@@ -64,6 +69,7 @@ export function buildQuestion(item: ContentItem, mode: GameMode, allItems: Conte
         mode,
         item,
         promptText: q.prompt,
+        questionText: q.questionText,
         options: q.options,
         answerIndex: q.answerIndex,
         showPhonetic: false
@@ -75,7 +81,7 @@ export function buildQuestion(item: ContentItem, mode: GameMode, allItems: Conte
         kind: "context",
         mode,
         item,
-        promptText: prompt,
+        promptText: prompt || "请根据场景猜词",
         contextHint: hint,
         showPhonetic: false
       };

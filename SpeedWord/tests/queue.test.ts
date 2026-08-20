@@ -47,19 +47,33 @@ describe("pickDistractors", () => {
     expect(d.every((x) => x.id !== ITEMS[0].id)).toBe(true);
   });
 
-  it("不足干扰项时返回可用的", () => {
-    const d = pickDistractors(ITEMS.slice(0, 2), ITEMS[0], 3);
-    expect(d.length).toBeLessThanOrEqual(1);
+  it("不足干扰项时用核心词库补充，确保至少3个", () => {
+    // 词包只有2个词：apple, banana
+    const small = [ITEMS[0], ITEMS[1]];
+    const d = pickDistractors(small, small[0], 3);
+    // V4.2: 不足时用核心词库补充，确保 >= 3 个
+    expect(d.length).toBeGreaterThanOrEqual(3);
+    // 干扰项不含目标词
+    expect(d.every((x) => x.id !== small[0].id)).toBe(true);
+  });
+
+  it("小词包（3词）也能产生4个选项", () => {
+    const small = ITEMS.slice(0, 3);
+    const d = pickDistractors(small, small[0], 3);
+    expect(d.length).toBeGreaterThanOrEqual(3);
   });
 });
 
 describe("buildChoiceQuestion", () => {
-  it("英译中：prompt 为英文，选项为中文", () => {
+  it("英译中：prompt 为英文，选项为中文，有教学化题干", () => {
     const q = buildChoiceQuestion(ITEMS, ITEMS[0], "en2zh");
     expect(q.prompt).toBe("apple");
     expect(q.options).toHaveLength(4);
     expect(q.answerIndex).toBeGreaterThanOrEqual(0);
     expect(q.options[q.answerIndex]).toBe(ITEMS[0].meaningZh);
+    // V4.2: 有 questionText
+    expect(q.questionText).toBeTruthy();
+    expect(typeof q.questionText).toBe("string");
   });
 
   it("中译英：prompt 为中文，选项为英文", () => {
@@ -67,12 +81,20 @@ describe("buildChoiceQuestion", () => {
     expect(q.prompt).toBe("apple的中文");
     expect(q.options).toContain("apple");
     expect(q.options[q.answerIndex]).toBe("apple");
+    expect(q.questionText).toBeTruthy();
   });
 
   it("答案索引指向目标词的文本或释义（方向随机）", () => {
     const q = buildChoiceQuestion(ITEMS, ITEMS[2], "choice");
     const answer = q.options[q.answerIndex];
     expect(answer === q.answerItem.text || answer === q.answerItem.meaningZh).toBe(true);
+  });
+
+  it("小词包（3词）仍可生成4个选项", () => {
+    const small = ITEMS.slice(0, 3);
+    const q = buildChoiceQuestion(small, small[0], "en2zh");
+    expect(q.options.length).toBeGreaterThanOrEqual(4);
+    expect(q.options[q.answerIndex]).toBe(small[0].meaningZh);
   });
 });
 

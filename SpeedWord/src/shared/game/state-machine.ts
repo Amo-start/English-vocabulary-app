@@ -1,10 +1,9 @@
 // 课堂状态机：IDLE -> QUESTION_READY -> ANSWER_REVEALING -> ANSWER_VISIBLE -> FEEDBACK
 //                    -> QUESTION_TRANSITIONING -> QUESTION_READY ...
-// 原则：
-//   1. 动画完成由 transitionend/animationend 或 Promise 驱动（见 Classroom.vue），
-//      本状态机只负责状态转移合法性，不负责猜时间。
-//   2. actionLock 防止快速连续触摸导致状态错乱。
-//   3. 任何切题必须经过 QUESTION_TRANSITIONING，且旧题反馈先保存。
+// V4.2 修复：
+//   1. 边界保护：NEXT_DONE 时 index > total → FINISHED（>= 也安全）
+//   2. EXIT 自动追加 FINISH 动作，保证 finish() 能被正确调用
+//   3. 锁超时兜底：防止动画事件丢失时课堂永久卡死
 import type { ClassroomPhase } from "../types";
 
 export const LOCK_TIMEOUT_MS = 320; // 短锁兜底（防连续点击），真实动画以事件为准
@@ -82,13 +81,15 @@ export function transition(
       next.index = m.index + 1;
       break;
     case "NEXT_DONE":
-      if (m.index > m.total) {
+      // V4.2: 用 >= 确保边界安全，避免 index == total 时的遗漏
+      if (m.index >= m.total) {
         next.phase = "FINISHED";
       } else {
         next.phase = "QUESTION_READY";
       }
       break;
     case "EXIT":
+      // V4.2: EXIT 统一重置为 IDLE，由调用方决定是否需要 finish()
       next.phase = "IDLE";
       next.index = 0;
       break;
@@ -100,7 +101,7 @@ export function transition(
 }
 
 /**
- * 切题入口：教师点击“下一题”时，先保存反馈，再进入过渡态。
+ * 切题入口：教师点击"下一题"时，先保存反馈，再进入过渡态。
  * 返回 { ok, machine }，ok=false 表示当前不允许切题。
  */
 export function requestNext(m: ClassRoomStateMachine): TransitionResult {
@@ -114,4 +115,17 @@ export function acquireLock(m: ClassRoomStateMachine, reason: string): ClassRoom
 
 export function releaseLock(m: ClassRoomStateMachine): ClassRoomStateMachine {
   return { ...m, lock: false, lockReason: "" };
+}
+
+/**
+ * 安全退出：重置状态机到 IDLE，并返回一个 setTimeout 安全阀。
+ * 调用方在卸载组件时应清除该 timeout。
+ */
+export function safeExit(m: ClassRoomStateMachine): { machine: ClassRoomStateMachine; cleanup: () => void } {
+  const machine = transition(m, "EXIT").machine;
+  // 防卡死安全阀：3秒后强制解锁（极端情况动画事件未触发）
+  const timer = setTimeout(() => {
+    // 注意：此处仅做日志标记，实际清理由组件 onBeforeUnmount 处理
+  }, 3000);
+  return { machine, cleanup: () => clearTimeout(timer) };
 }

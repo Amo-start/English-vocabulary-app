@@ -40,13 +40,17 @@ describe("buildQuestion 各玩法出题", () => {
     expect(noImg.promptText).toBe("banana");
   });
 
-  it("选择挑战：4 个选项且答案索引合法（方向随机）", () => {
+  it("选择挑战：4 个选项且答案索引合法，包含教学化题干", () => {
     const q = buildQuestion(ITEMS[0], "choice", ITEMS);
     expect(q.kind).toBe("choice");
     expect(q.options?.length).toBeGreaterThanOrEqual(3);
     expect(q.answerIndex).toBeGreaterThanOrEqual(0);
     expect(q.promptText).toBeTruthy();
     expect(q.options?.[q.answerIndex!]).toBeTruthy();
+    // V4.2: 必须有 questionText（教学化题干）
+    expect(q.questionText).toBeTruthy();
+    expect(typeof q.questionText).toBe("string");
+    expect(q.questionText!.length).toBeGreaterThan(3);
     // 选项应包含目标词的文本或释义之一（方向随机，两种都算对）
     const hasTargetText = q.options!.includes(ITEMS[0].text);
     const hasTargetMeaning = q.options!.includes(ITEMS[0].meaningZh);
@@ -54,12 +58,19 @@ describe("buildQuestion 各玩法出题", () => {
     expect(q.options?.[q.answerIndex!]).not.toBeUndefined();
   });
 
-  it("英译中 / 中译英", () => {
+  it("英译中：prompt 为英文，选项为中文，有题干", () => {
     const en = buildQuestion(ITEMS[0], "en2zh", ITEMS);
     expect(en.kind).toBe("choice");
     expect(en.promptText).toBe("apple");
+    expect(en.questionText).toContain("apple");
+    expect(en.options).toContain("apple的中文");
+  });
+
+  it("中译英：prompt 为中文，选项为英文，有题干", () => {
     const zh = buildQuestion(ITEMS[0], "zh2en", ITEMS);
-    expect(zh.promptText).toBe("apple的中文");
+    expect(zh.kind).toBe("choice");
+    expect(zh.questionText).toContain("apple的中文");
+    expect(zh.options).toContain("apple");
   });
 
   it("情境猜词：提示首字母", () => {

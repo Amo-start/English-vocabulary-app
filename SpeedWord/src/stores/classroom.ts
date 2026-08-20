@@ -1,4 +1,8 @@
 // 课堂 Store：Session 编排 + 状态机集成 + 班级反馈 + 连击 + 复习池
+// V4.2 修复：
+//   1. exit() 幂等：多次调用安全
+//   2. finish() 幂等：已结束时不重复保存
+//   3. abort() 完整清理所有状态
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { ClassroomQuestion } from "../shared/game/question";
@@ -142,16 +146,19 @@ export const useClassroomStore = defineStore("classroom", () => {
     });
   }
 
-  /** 结束课堂：落盘 Session 汇总 + 复习池 */
+  /**
+   * 结束课堂：落盘 Session 汇总 + 复习池。
+   * V4.2: 幂等 — 已结束时不重复保存。
+   */
   async function finish(): Promise<void> {
-    if (!session.value) return;
+    if (!session.value || !running.value) return;
     const reviewStore = useReviewStore();
     // 收集「重点复习」进入复习池
     for (const [itemId, signal] of Object.entries(feedbackMap.value)) {
       if (signal === "review") {
         const item = queue.value.find((q) => q.id === itemId);
         if (item) {
-          await reviewStore.add(pack.value?.id || "", itemId, "课堂标记重点复习", session.value.id, mode.value);
+          await reviewStore.add(pack.value?.id || "", itemId, "课堂标记重点复习", session.value!.id, mode.value);
         }
       }
     }
@@ -173,8 +180,24 @@ export const useClassroomStore = defineStore("classroom", () => {
     return c;
   }
 
-  /** 退出课堂（不完成统计时） */
+  /**
+   * 退出课堂（不完成统计时）。
+   * V4.2: 幂等 — 已退出时直接返回；清理所有状态。
+   */
   async function abort(): Promise<void> {
+    // 幂等：已经在 IDLE 或非 running 状态，直接返回
+    if (!running.value) {
+      running.value = false;
+      machine.value = createMachine(0);
+      question.value = null;
+      feedbackMap.value = {};
+      answerRecords.value = [];
+      combo.value = 0;
+      comboMax.value = 0;
+      correctCount.value = 0;
+      totalAnswered.value = 0;
+      return;
+    }
     if (session.value) {
       session.value.endedAt = now();
       await window.api.sessionUpdate(session.value);
@@ -182,6 +205,12 @@ export const useClassroomStore = defineStore("classroom", () => {
     running.value = false;
     machine.value = createMachine(0);
     question.value = null;
+    feedbackMap.value = {};
+    answerRecords.value = [];
+    combo.value = 0;
+    comboMax.value = 0;
+    correctCount.value = 0;
+    totalAnswered.value = 0;
   }
 
   return {
