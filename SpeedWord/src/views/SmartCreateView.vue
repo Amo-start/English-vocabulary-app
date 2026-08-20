@@ -19,7 +19,9 @@ const results = ref<EnrichResult[]>([]);
 const busy = ref(false);
 const progress = reactive({ done: 0, total: 0, current: "" });
 const offlineOnly = ref(false);
+const saving = ref(false);
 const saved = ref(false);
+const saveError = ref<string>("");
 const parsedCount = computed(() => parseInputText(rawText.value).lines.length);
 
 const packOptions = computed(() => packs.packs);
@@ -28,7 +30,6 @@ async function generate(): Promise<void> {
   const { lines } = parseInputText(rawText.value);
   if (!lines.length) { ui.toast("请先粘贴至少一个单词/词组", "warn"); return; }
   if (!targetPackId.value) {
-    // 没有目标词包 → 要求先建
     const name = newPackName.value.trim() || rawText.value.split(/\r?\n/)[0].trim() || "新词包";
     const p = await packs.createPack(name.slice(0, 40), "");
     targetPackId.value = p.id;
@@ -46,7 +47,9 @@ async function generate(): Promise<void> {
     );
     for (const r of results.value) r.item.packId = targetPackId.value;
     const errCount = results.value.filter((r) => r.errors.length).length;
-    ui.toast(`生成完成：${results.value.length} 条，其中 ${errCount} 条有提示（可手动修正）`, errCount ? "warn" : "success");
+    const imgOk = results.value.filter((r) => r.source.image === "ai" || r.source.image === "api").length;
+    const imgNone = results.value.filter((r) => r.source.image === "none" || r.source.image === "legacy_builtin").length;
+    ui.toast(`生成完成：${results.value.length} 条（AI图片 ${imgOk} 张，无图 ${imgNone} 张）${errCount ? `，${errCount} 条有提示` : ""}`, errCount || imgNone ? "warn" : "success");
   } catch (e) {
     ui.toast(`生成失败：${(e as Error).message}`, "error");
   } finally {
@@ -55,19 +58,90 @@ async function generate(): Promise<void> {
   }
 }
 
+/**
+ * V4.1: 将结果转为 Plain DTO，不包含 Vue Proxy / 不可序列化的字段。
+ * 只传主进程需要保存的核心字段。
+ */
+function toDraftDTO(r: EnrichResult) {
+  const it = r.item;
+  return {
+    draftId: String(it.id),
+    type: it.type,
+    text: String(it.text || ""),
+    phonetic: String(it.phonetic || ""),
+    partOfSpeech: String(it.partOfSpeech || ""),
+    meaningZh: String(it.meaningZh || ""),
+    definitionEn: String(it.definitionEn || ""),
+    example: String(it.example || ""),
+    audio: { source: it.audio.source, status: it.audio.status, url: it.audio.url, localPath: it.audio.localPath },
+    image: {
+      localPath: it.image?.localPath || "",
+      // 兼容旧 "builtin" → 新 "legacy_builtin"
+      sourceType: (it.image?.sourceType === "builtin" ? "legacy_builtin" : it.image?.sourceType || "api") as import("../shared/draft-types").DraftImageSource,
+      sourceUrl: it.image?.sourceUrl || "",
+      description: it.image?.description || "",
+      status: it.image?.status || "ok",
+      locked: !!it.image?.locked,
+      history: (it.image?.history || []).map((h: any) => ({
+        localPath: h.localPath || "",
+        sourceType: h.sourceType || "api",
+        at: h.at || Date.now()
+      }))
+    },
+    aiMeta: {
+      generatedBy: it.aiMeta?.generatedBy || "none",
+      generatedAt: it.aiMeta?.generatedAt || 0,
+      promptVersion: it.aiMeta?.promptVersion,
+      provider: it.aiMeta?.provider,
+      model: it.aiMeta?.model,
+      memoryHint: it.aiMeta?.memoryHint || "",
+      imageDescription: it.aiMeta?.imageDescription || ""
+    },
+    fieldState: {
+      phonetic: it.fieldState?.phonetic || "auto",
+      meaningZh: it.fieldState?.meaningZh || "auto",
+      definitionEn: it.fieldState?.definitionEn || "auto",
+      example: it.fieldState?.example || "auto",
+      image: it.fieldState?.image || "auto",
+      audio: it.fieldState?.audio || "auto"
+    },
+    verified: !!it.verified,
+    locked: !!it.locked
+  };
+}
+
 async function save(): Promise<void> {
   if (!targetPackId.value) { ui.toast("缺少目标词包", "error"); return; }
   if (!results.value.length) { ui.toast("没有可保存的内容", "warn"); return; }
-  const items = results.value.map((r) => r.item);
-  await packs.addItems(targetPackId.value, items);
-  saved.value = true;
-  ui.toast(`已保存 ${items.length} 个词条到词包`, "success");
+  if (saving.value) return;
+  saving.value = true;
+  saved.value = false;
+  saveError.value = "";
+  try {
+    // V4.1: 使用 addDraftItems（传 Plain DTO），主进程生成正式 UUID
+    const mapping = await packs.addDraftItems(targetPackId.value, results.value.map(toDraftDTO));
+    // 用 mapping 更新本地 item.id（从 draftId 换成 persistentId）
+    for (const r of results.value) {
+      const pid = mapping[r.item.id];
+      if (pid) r.item.id = pid;
+    }
+    saved.value = true;
+    const count = results.value.length;
+    ui.toast(`✓ 词包保存成功，共 ${count} 个词条`, "success");
+  } catch (e) {
+    const msg = (e as Error).message || "保存失败";
+    saveError.value = msg;
+    ui.toast(`✕ 保存失败：${msg}`, "error");
+  } finally {
+    saving.value = false;
+  }
 }
 
 function reset(): void {
   rawText.value = "";
   results.value = [];
   saved.value = false;
+  saveError.value = "";
   progress.done = 0; progress.total = 0;
 }
 
@@ -91,17 +165,19 @@ function toggleLock(item: ContentItem, field: "meaningZh" | "example" | "image")
 async function regenImage(idx: number): Promise<void> {
   const r = results.value[idx];
   const item = r.item;
-  // 生成前先检查 fieldState（image locked 不覆盖）
   if (item.fieldState.image === "locked") { ui.toast("该图片已锁定，自动生成不会覆盖（可先解锁）", "warn"); return; }
-  const desc = item.image.description || item.aiMeta.imageDescription || item.text;
   ui.toast(`正在生成图片：${item.text}…`, "info", 1200);
   try {
-    const gen = await window.api.aiRegenImageByDescription(item, desc);
+    // 使用 contentId-only 通道，避免传整个 Vue reactive 对象触发 DataCloneError
+    const gen = await window.api.imageRegenerate({
+      contentId: String(item.id),
+      customInstruction: item.image.description || item.aiMeta.imageDescription || undefined
+    });
     item.image = {
       localPath: gen.localPath,
       sourceType: gen.sourceType as ContentItem["image"]["sourceType"],
       sourceUrl: gen.sourceUrl,
-      description: desc,
+      description: gen.description || item.image.description || "",
       status: "ok",
       locked: item.image.locked,
       history: item.image.history || []
@@ -139,13 +215,16 @@ onMounted(() => {
       <textarea
         v-model="rawText"
         rows="6"
-        placeholder="apple&#10;banana&#10;take care of&#10;I have to take care of my little brother."
+        placeholder="apple
+banana
+take care of
+I have to take care of my little brother."
       />
       <div class="row space-between" style="margin-top: 10px">
         <div class="row" style="gap: 10px">
           <button class="btn btn-sm" @click="loadSample">📋 填入示例</button>
           <button class="btn btn-sm" @click="rawText = ''">清空</button>
-          <span class="faint">{{ parsedCount }} 条将被识别</span>
+          <span class="muted">{{ parsedCount }} 条将被识别</span>
         </div>
         <label class="row" style="gap: 8px; cursor: pointer">
           <div class="switch" :class="{ on: offlineOnly }" @click="offlineOnly = !offlineOnly" />
@@ -191,8 +270,17 @@ onMounted(() => {
         <div class="section-title" style="margin: 0">② 查看 / 修正（{{ results.length }} 条）</div>
         <div class="row" style="gap: 8px">
           <button class="btn btn-sm" @click="reset">重置</button>
-          <button class="btn btn-primary" @click="save" :disabled="saved">💾 保存到词包</button>
+          <button class="btn btn-primary" @click="save" :disabled="saved || saving">
+            💾 保存到词包 {{ saving ? '…' : '' }}
+          </button>
         </div>
+      </div>
+
+      <!-- 图片状态摘要 -->
+      <div class="row" style="gap: 12px; margin-bottom: 12px; flex-wrap: wrap">
+        <span class="chip" style="background: var(--success-soft)">✅ AI 图片 {{ results.filter(r => r.source.image === 'ai').length }} 张</span>
+        <span class="chip" style="background: var(--info-soft)">🌐 API 图片 {{ results.filter(r => r.source.image === 'api').length }} 张</span>
+        <span class="chip" style="background: var(--warn-soft)">⚠ 无图 {{ results.filter(r => r.source.image === 'none' || r.source.image === 'legacy_builtin').length }} 张</span>
       </div>
 
       <div class="stack">
@@ -202,9 +290,9 @@ onMounted(() => {
             <img v-if="r.item.image?.localPath" :src="r.item.image.localPath" alt="" />
             <div v-else class="noimg">🖼️</div>
             <div class="row" style="justify-content: center; gap: 6px; margin-top: 6px; flex-wrap: wrap">
-              <span class="chip">{{ r.item.image.sourceType || "无" }}</span>
+              <span class="chip">{{ r.item.image?.sourceType || "无" }}</span>
               <span v-if="r.item.fieldState.image === 'locked'" class="chip locked">🔒 锁定</span>
-            </div>
+              <span v-if="r.item.image?.status === 'failed'" class="chip" style="background:var(--warn-soft)">⚠ 失败</span>            </div>
           </div>
           <!-- 右：字段 -->
           <div class="rc-body">
@@ -249,12 +337,13 @@ onMounted(() => {
               💡 记忆提示：{{ r.item.aiMeta.memoryHint }}
             </div>
             <div v-if="r.item.aiMeta?.imageDescription" class="hint-line faint">
-              🎨 图片描述：{{ r.item.aiMeta.imageDescription }}
+              🎨 图片场景：{{ r.item.aiMeta.imageDescription }}
             </div>
           </div>
         </div>
       </div>
 
+      <div v-if="saveError" class="err-line" style="margin-top:10px">✕ {{ saveError }}</div>
       <div v-if="saved" class="saved-banner">
         ✅ 已保存！可以 <button class="btn btn-sm btn-primary" @click="ui.go('item-editor', { packId: targetPackId })">进入词条编辑</button>
         &nbsp;或 <button class="btn btn-sm" @click="ui.go('game-center', { packId: targetPackId })">开始课堂 →</button>

@@ -1,14 +1,15 @@
 // SQLite 数据层（sql.js / WASM，无需本地编译，Windows 低硬件可运行）
-// 表：word_packs / content_items / media_assets / classroom_sessions /
-//     classroom_feedback / app_settings / ai_provider_settings / review_pool
+// V4.1: 新增 itemsAddDrafts — Draft→Persistent 映射，主进程生成正式 UUID
 import type { Database as SqlJsDatabase } from "sql.js";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { userDataDir, safeJsonParse, safeStringify } from "./util";
 import type {
   ContentItem, WordPack, MediaAsset, ClassroomSession, ClassroomFeedback,
   ReviewEntry, AiProviderConfig
 } from "../src/shared/types";
+import type { DraftSavePayload } from "../src/shared/draft-types";
 
 export interface Db {
   db: SqlJsDatabase;
@@ -134,6 +135,17 @@ export function migrateSchema(db: SqlJsDatabase): void {
     last_practiced INTEGER
   );
   `);
+
+  // V4.1: 将存量 builtin 图片标记为 legacy_builtin（离线兜底）
+  const schemaVer = settingsGet(db, "schema_version");
+  if (!schemaVer || Number(schemaVer) < 2) {
+    db.run(`
+      UPDATE content_items
+      SET image_json = json_set(image_json, '$.sourceType', 'legacy_builtin')
+      WHERE json_extract(image_json, '$.sourceType') = 'builtin'
+    `);
+    settingsSet(db, "schema_version", "2");
+  }
 }
 
 // ---------- 工具 ----------
@@ -331,6 +343,64 @@ export function itemReplaceAll(db: SqlJsDatabase, packId: string, items: Content
     for (const it of items) itemInsert(db, it);
     run(db, `UPDATE word_packs SET updated_at=? WHERE id=?`, [Date.now(), packId]);
   });
+}
+
+/**
+ * V4.1: 将 Draft 词条批量转为 Persistent 词条，主进程生成正式 UUID。
+ * 事务原子写入；失败则全部回滚。
+ * @returns { persistentIds, mapping } persistentIds[i] 对应 drafts[i]
+ */
+export interface AddDraftsResult {
+  persistentIds: string[];
+  /** draftId → persistentId 映射 */
+  mapping: Record<string, string>;
+}
+
+export function itemsAddDrafts(db: SqlJsDatabase, packId: string, drafts: DraftSavePayload[]): AddDraftsResult {
+  const persistentIds: string[] = [];
+  const mapping: Record<string, string> = {};
+  const now = Date.now();
+  tx(db, () => {
+    for (let i = 0; i < drafts.length; i++) {
+      const d = drafts[i];
+      const pid = randomUUID();
+      persistentIds.push(pid);
+      // 使用 draftId 作为 key（若不存在则用索引兜底）
+      const key = d.draftId || `draft_${i}`;
+      mapping[key] = pid;
+      const item: ContentItem = {
+        id: pid,
+        packId,
+        sort: i,
+        type: d.type,
+        text: d.text,
+        phonetic: d.phonetic,
+        partOfSpeech: d.partOfSpeech,
+        meaningZh: d.meaningZh,
+        definitionEn: d.definitionEn,
+        example: d.example,
+        audio: d.audio,
+        image: d.image as ContentItem["image"],
+        aiMeta: d.aiMeta,
+        fieldState: d.fieldState,
+        verified: d.verified,
+        locked: d.locked,
+        createdAt: now,
+        updatedAt: now
+      };
+      itemInsert(db, item);
+    }
+    // 校验数量
+    const stmt = db.prepare("SELECT COUNT(*) AS c FROM content_items WHERE pack_id=?");
+    stmt.bind([packId]);
+    stmt.step();
+    const cnt = (stmt.getAsObject().c as number) ?? 0;
+    stmt.free();
+    if (cnt !== drafts.length) {
+      throw new Error(`itemsAddDrafts 校验失败：期望 ${drafts.length} 条，实际 ${cnt}`);
+    }
+  });
+  return { persistentIds, mapping };
 }
 
 // ---------- 媒体 ----------

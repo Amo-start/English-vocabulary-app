@@ -6,6 +6,7 @@ import { uid, now } from "../shared/uuid";
 import { EMPTY_FIELD_STATE } from "../shared/fieldstate";
 import { detectContentType } from "../shared/type-detect";
 import { newImagePlaceholder } from "./helpers";
+import type { DraftSavePayload } from "../shared/draft-types";
 
 export const usePacksStore = defineStore("packs", () => {
   const packs = ref<WordPack[]>([]);
@@ -87,6 +88,24 @@ export const usePacksStore = defineStore("packs", () => {
     items.value = items.value.filter((i) => i.id !== id);
   }
 
+  /**
+   * V4.1: 将 Draft 词条批量保存到词包。
+   * 前端发送 Plain DTO（不含 Vue Proxy），主进程生成正式 UUID。
+   * 返回 mapping：draftId → persistentId，用于前端更新本地状态。
+   */
+  async function addDraftItems(
+    packId: string,
+    drafts: Array<{ draftId: string } & Omit<DraftSavePayload, "draftId">>
+  ): Promise<Record<string, string>> {
+    const res = await window.api.itemsAddDrafts(packId, drafts as DraftSavePayload[]);
+    // 校验映射数量
+    if (res.persistentIds.length !== drafts.length) {
+      throw new Error(`保存数量不匹配：期望 ${drafts.length}，实际 ${res.persistentIds.length}`);
+    }
+    return res.mapping;
+  }
+
+  /** 向后兼容：直接保存 ContentItem 数组（用于词条编辑器等场景） */
   async function addItems(packId: string, newItems: ContentItem[]): Promise<void> {
     const existing = items.value;
     const base = existing.length;
@@ -98,13 +117,17 @@ export const usePacksStore = defineStore("packs", () => {
       createdAt: now(),
       updatedAt: now()
     }));
+    // 合并后本地数组先更新（乐观 UI），再落库
     items.value = [...existing, ...prepared];
-    await window.api.itemsReplaceAll(packId, items.value);
+    const res = await window.api.itemsReplaceAll(packId, items.value);
+    if (res && res.count !== undefined && res.count !== items.value.length) {
+      throw new Error(`保存数量不匹配：期望 ${items.value.length}，实际 ${res.count}`);
+    }
   }
 
   return {
     packs, items, currentPackId, loading,
     loadPacks, loadItems, createPack, updatePack, deletePack, getPack,
-    newItem, saveItem, removeItem, addItems
+    newItem, saveItem, removeItem, addItems, addDraftItems
   };
 });

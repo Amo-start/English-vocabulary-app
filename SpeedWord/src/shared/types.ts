@@ -21,8 +21,8 @@ export interface FieldState {
   audio: FieldStateValue;
 }
 
-/** 图片来源类型 */
-export type ImageSourceType = "builtin" | "api" | "ai" | "user";
+/** 图片来源类型（V4.1: builtin 降级为 legacy_builtin，仅作为离线兜底） */
+export type ImageSourceType = "builtin" | "api" | "ai" | "user" | "legacy_builtin";
 
 /** 图片历史版本 */
 export interface ImageHistoryEntry {

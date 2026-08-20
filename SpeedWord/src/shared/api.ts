@@ -4,6 +4,7 @@ import type {
   ContentItem, WordPack, MediaAsset, ClassroomSession, ClassroomFeedback,
   ReviewEntry, AiProviderConfig, EnrichResult
 } from "./types";
+import type { DraftSavePayload } from "./draft-types";
 
 export interface EnrichRequestItem {
   text: string;
@@ -101,6 +102,8 @@ export interface SpeedWordApi {
   itemSave(item: ContentItem): Promise<ContentItem | undefined>;
   itemDelete(id: string): Promise<{ ok: boolean }>;
   itemsReplaceAll(packId: string, items: ContentItem[]): Promise<{ ok: boolean; count: number }>;
+  // V4.1: Draft→Persistent 批量保存（主进程生成正式 UUID）
+  itemsAddDrafts(packId: string, drafts: DraftSavePayload[]): Promise<{ persistentIds: string[]; mapping: Record<string, string> }>;
   // 媒体
   mediaList(kind?: "image" | "audio"): Promise<MediaAsset[]>;
   mediaRegister(m: MediaAsset): Promise<MediaAsset>;
@@ -128,6 +131,8 @@ export interface SpeedWordApi {
   aiEnrichItems(texts: EnrichRequestItem[], opts?: { offlineOnly?: boolean }): Promise<EnrichResult[]>;
   aiRegenField(item: ContentItem, field: string): Promise<Partial<ContentItem>>;
   aiRegenImageByDescription(item: ContentItem, description: string): Promise<AppliedImage>;
+  /** contentId-only 重新生成图片（避免传整个词条对象触发 DataCloneError） */
+  imageRegenerate(params: { contentId: string; customInstruction?: string }): Promise<AppliedImage>;
   // 图片
   imagePickAndImport(): Promise<{ ok: boolean; result?: AppliedImage; message?: string }>;
   imageSearch(query: string): Promise<ImageSearchHit[]>;

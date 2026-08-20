@@ -88,7 +88,7 @@ describe("sanitizeAiConfig（只存白名单字段 + URL 归一化 + 剥离密�
   });
   it("剥离 hasKey / apiKey 等敏感或派生字段", () => {
     const clean = sanitizeAiConfig(config({ apiKey: "sk-secret-123", hasKey: true }));
-    expect((clean as Record<string, unknown>).apiKey).toBeUndefined();
+    expect((clean as unknown as Record<string, unknown>).apiKey).toBeUndefined();
     expect(clean.hasKey).toBe(false);
     expect(clean.advanced.text.hasKey).toBe(false);
     expect(clean.advanced.image.hasKey).toBe(false);
@@ -96,7 +96,7 @@ describe("sanitizeAiConfig（只存白名单字段 + URL 归一化 + 剥离密�
   it("非法 mode 回落 cloud；未知字段被丢弃", () => {
     const clean = sanitizeAiConfig(config({ mode: "weird", evil: "x" }));
     expect(clean.mode).toBe("cloud");
-    expect((clean as Record<string, unknown>).evil).toBeUndefined();
+    expect((clean as unknown as Record<string, unknown>).evil).toBeUndefined();
   });
 });
 

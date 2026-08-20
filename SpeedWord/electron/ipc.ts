@@ -5,6 +5,7 @@ import type { Db } from "./db";
 import {
   packList, packGet, packCreate, packUpdate, packDelete,
   itemList, itemGet, itemInsert, itemUpdate, itemDelete, itemReplaceAll,
+  itemsAddDrafts,
   mediaList, mediaInsert, mediaDelete,
   sessionCreate, sessionUpdate, sessionList,
   feedbackUpsert, feedbackListBySession, feedbackListByPack,
@@ -24,6 +25,7 @@ import type { ContentItem, MediaAsset, ClassroomSession, ClassroomFeedback, Revi
 import type { ServiceTestResult, AiGenerateTextResult, AiGenerateImageResult } from "../src/shared/api";
 import path from "node:path";
 import fs from "node:fs";
+import { buildFallbackImagePrompt } from "./image-prompt-builder";
 
 export function registerIpc(db: Db): void {
   const send = (channel: string, payload: unknown) => {
@@ -69,6 +71,12 @@ export function registerIpc(db: Db): void {
     itemReplaceAll(db.db, packId, items);
     db.save();
     return { ok: true, count: items.length };
+  });
+  // V4.1: Draft → Persistent 批量保存，主进程生成正式 UUID，返回 mapping
+  ipcMain.handle("items:addDrafts", (_e, packId: string, drafts: import("../src/shared/draft-types").DraftSavePayload[]) => {
+    const result = itemsAddDrafts(db.db, packId, drafts);
+    db.save();
+    return result;
   });
 
   // ---------- 媒体 ----------
@@ -232,9 +240,30 @@ export function registerIpc(db: Db): void {
   ipcMain.handle("ai:regenImageByDescription", async (_e, item: ContentItem, description: string) => {
     const cfg = await collectResolvedCfg(db);
     if (!cfg.image.enabled) throw new Error("AI 图片服务未配置");
+    const prompt = description || buildFallbackImagePrompt(item.text, item.type);
     const gen = await generateImage(new OpenAiCompatibleImage({
       baseUrl: cfg.image.baseUrl, apiKey: cfg.image.apiKey, model: cfg.image.model, provider: cfg.image.provider
-    }), description);
+    }), prompt);
+    return gen;
+  });
+  // contentId-only 重新生成（避免 DataCloneError：不再传整个 Vue 词条对象）
+  ipcMain.handle("image:regenerate", async (_e, params: { contentId: string; customInstruction?: string }) => {
+    const { contentId, customInstruction } = (params || {}) as { contentId?: string; customInstruction?: string };
+    if (!contentId) throw new Error("缺少 contentId");
+    const item = itemGet(db.db, String(contentId));
+    if (!item) throw new Error(`词条不存在：${contentId}`);
+    const cfg = await collectResolvedCfg(db);
+    if (!cfg.image.enabled) throw new Error("AI 图片服务未配置");
+    const promptBuilder = (await import("./image-prompt-builder")).buildImagePrompt;
+    const prompt = promptBuilder({
+      word: item.text,
+      type: item.type,
+      meaningZh: item.meaningZh || undefined,
+      customInstruction: customInstruction || item.aiMeta.imageDescription || undefined
+    });
+    const gen = await generateImage(new OpenAiCompatibleImage({
+      baseUrl: cfg.image.baseUrl, apiKey: cfg.image.apiKey, model: cfg.image.model, provider: cfg.image.provider
+    }), prompt);
     return gen;
   });
 

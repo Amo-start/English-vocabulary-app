@@ -16,6 +16,8 @@ const api: SpeedWordApi = {
   itemSave: (item: unknown) => ipcRenderer.invoke("items:save", item),
   itemDelete: (id: string) => ipcRenderer.invoke("items:delete", id),
   itemsReplaceAll: (packId: string, items: unknown[]) => ipcRenderer.invoke("items:replaceAll", packId, items),
+  // V4.1: Draft→Persistent 批量保存
+  itemsAddDrafts: (packId: string, drafts: unknown[]) => ipcRenderer.invoke("items:addDrafts", packId, drafts),
   // 媒体
   mediaList: (kind?: string) => ipcRenderer.invoke("media:list", kind),
   mediaRegister: (m: unknown) => ipcRenderer.invoke("media:register", m),
@@ -44,6 +46,8 @@ const api: SpeedWordApi = {
     ipcRenderer.invoke("ai:enrichItems", texts, opts),
   aiRegenField: (item: unknown, field: string) => ipcRenderer.invoke("ai:regenField", item, field),
   aiRegenImageByDescription: (item: unknown, description: string) => ipcRenderer.invoke("ai:regenImageByDescription", item, description),
+  // contentId-only 重新生成（避免 DataCloneError）
+  imageRegenerate: (params: { contentId: string; customInstruction?: string }) => ipcRenderer.invoke("image:regenerate", params),
   // 图片
   imagePickAndImport: () => ipcRenderer.invoke("image:pickAndImport"),
   imageSearch: (query: string) => ipcRenderer.invoke("image:search", query),

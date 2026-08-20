@@ -1,12 +1,15 @@
-// 智能补全编排：词典 → AI 教学化 → 图片策略 → 组装 ContentItem
-// 异常按词条隔离：单个词条失败不影响其他词条。
+// 智能补全编排：词典 → AI 教学化 → 场景描述生成 → AI 图片
+// V4.1 重构：
+//   1. builtin 降级为 legacy_builtin，仅离线兜底
+//   2. AI 图片优先，使用 SceneGenerator 先生成场景描述再绘图（避免词汇原文出现在图片中）
+//   3. 图片失败不阻塞核心保存
 import { DictionaryService, dictionaryService, type DictEntry } from "./dictionary";
 import {
   collectResolvedCfg, OpenAiCompatibleText, OpenAiCompatibleImage, parseModelJson, AiError,
   type ResolvedAiCfg
 } from "./ai";
 import {
-  findBuiltinImage, searchImageApi, generateImage, cacheApiImage, builtinUrl, newImagePlaceholder
+  findBuiltinImage, searchImageApi, generateImage, cacheApiImage, builtinUrl
 } from "./images";
 import type { Db } from "./db";
 import { detectContentType, typeLabel } from "../src/shared/type-detect";
@@ -14,6 +17,7 @@ import { uid } from "../src/shared/uuid";
 import { EMPTY_FIELD_STATE } from "../src/shared/fieldstate";
 import type { ContentItem, EnrichError, EnrichResult } from "../src/shared/types";
 import { httpGet } from "./util";
+import { buildImagePrompt, buildFallbackImagePrompt, generateVisualScene, type VisualScene } from "./image-prompt-builder";
 
 export interface EnrichOpts {
   /** 是否跳过在线词典与 AI（纯离线基础补全） */
@@ -36,7 +40,8 @@ interface AiEnrichPayload {
   definitionEn: string;
   example: string;
   memoryHint: string;
-  imageDescription: string;
+  /** 图片场景描述（AI 生成，不含词汇原文，用于图片生成） */
+  imageSceneDescription: string;
 }
 
 const SYSTEM_PROMPT = `你是经验丰富的初中英语教师，负责把英文词条加工成适合中国学生课堂使用的教学素材。
@@ -45,7 +50,10 @@ const SYSTEM_PROMPT = `你是经验丰富的初中英语教师，负责把英文
 2. definitionEn：给初中生看的英文释义，用简单词。
 3. example：一个自然、课堂可用的英文例句（配中文对照放 example 即可，格式 "英文. 中文。"）。
 4. memoryHint：帮助学生记忆的提示（联想/词根/谐音，中文）。
-5. imageDescription：适合生成"教学情境插画"的英文图片描述，要求主体明确、背景干净、画面无任何文字、适合教室大屏投影，60 词以内。
+5. imageSceneDescription：一段纯英文的场景描述，用于生成"教学情境插画"。
+   - 描述必须是具体的视觉画面（人物、动作、物体、场景），不能包含目标词汇本身。
+   - 例如 protect → "A school-age child stands bravely in front of a small puppy, holding an umbrella over the dog to shield it from rain."
+   - 要求：主体明确、背景干净、画面无任何文字、适合教室大屏投影，50词以内。
 只输出一个 JSON 对象，不要输出任何其他文字。`;
 
 function buildAiUserPrompt(item: string, type: string): string {
@@ -75,7 +83,7 @@ async function enrichWithAi(
     definitionEn: (data.definitionEn || "").trim(),
     example: (data.example || "").trim(),
     memoryHint: (data.memoryHint || "").trim(),
-    imageDescription: (data.imageDescription || "").trim()
+    imageSceneDescription: (data.imageSceneDescription || "").trim()
   };
 }
 
@@ -146,6 +154,7 @@ async function enrichOne(
   }
 
   // 2. AI 教学化（可选）
+  let aiSceneDesc = "";
   if (useAi && cfg.text.enabled) {
     try {
       const ai = await enrichWithAi(cfg.text, text, itemType);
@@ -153,7 +162,11 @@ async function enrichOne(
       if (ai.definitionEn && !item.definitionEn) { item.definitionEn = ai.definitionEn; source.definitionEn = "ai"; }
       if (ai.example && !item.example) { item.example = ai.example; source.example = "ai"; }
       if (ai.memoryHint) item.aiMeta.memoryHint = ai.memoryHint;
-      if (ai.imageDescription) item.aiMeta.imageDescription = ai.imageDescription;
+      // 使用新的 imageSceneDescription（纯场景描述，不含词汇原文）
+      if (ai.imageSceneDescription) {
+        aiSceneDesc = ai.imageSceneDescription;
+        item.aiMeta.imageDescription = aiSceneDesc;
+      }
       item.aiMeta.generatedBy = "ai";
       item.aiMeta.generatedAt = Date.now();
     } catch (e) {
@@ -161,34 +174,56 @@ async function enrichOne(
     }
   }
 
-  // 3. 图片策略
+  // 3. 图片策略（V4.1: AI 优先，builtin 降级为 legacy_builtin 离线兜底）
   try {
     const hasAiImage = cfg.image.enabled;
-    const builtin = findBuiltinImage(text);
-    if (builtin) {
-      item.image.localPath = builtinUrl(builtin.filename);
-      item.image.sourceType = "builtin";
-      item.image.status = "ok";
-      source.image = "builtin";
-    } else if (useOnlineDict || true) {
-      // API 搜索（Wikimedia，免费）
-      const found = await searchImageApi(text.replace(/\s+/g, " "), 4);
-      if (found.length) {
-        const cached = await cacheApiImage(found[0].thumbUrl, found[0].pageUrl, text);
-        item.image = { ...cached, status: "ok", locked: false, history: [] };
-        source.image = "api";
-      } else if (hasAiImage) {
-        // API 没搜到 → AI 生成
-        const desc = item.aiMeta.imageDescription || `Simple clean illustration of "${text}" for classroom screen, no text`;
-        const gen = await generateImage(new OpenAiCompatibleImage({
-          baseUrl: cfg.image.baseUrl, apiKey: cfg.image.apiKey, model: cfg.image.model, provider: cfg.image.provider
-        }), desc);
-        item.image = { ...gen, status: "ok", locked: false, history: [] };
-        source.image = "ai";
+    const useApi = useOnlineDict; // 有网络时优先 API 搜索
+
+    // 3a. API 图片搜索（Wikimedia）
+    let apiImage: Awaited<ReturnType<typeof cacheApiImage>> | null = null;
+    if (useApi) {
+      try {
+        const found = await searchImageApi(text.replace(/\s+/g, " "), 4);
+        if (found.length) {
+          apiImage = await cacheApiImage(found[0].thumbUrl, found[0].pageUrl, text);
+          source.image = "api";
+        }
+      } catch { /* 忽略 API 搜索失败 */ }
+    }
+
+    if (apiImage) {
+      item.image = { ...apiImage, status: "ok", locked: false, history: [] };
+    } else if (hasAiImage) {
+      // 3b. AI 图片生成（统一走 SceneGenerator + buildImagePrompt）
+      // 优先使用 AI 文本服务生成的 scene description
+      const sceneDesc = aiSceneDesc || generateVisualScene(text, item.meaningZh, itemType).sceneDescription;
+      const prompt = buildImagePrompt({
+        word: text,
+        type: itemType,
+        meaningZh: item.meaningZh || undefined,
+        sceneDescription: sceneDesc,
+        customInstruction: aiSceneDesc ? undefined : undefined
+      });
+      const gen = await generateImage(new OpenAiCompatibleImage({
+        baseUrl: cfg.image.baseUrl, apiKey: cfg.image.apiKey, model: cfg.image.model, provider: cfg.image.provider
+      }), prompt);
+      item.image = { ...gen, status: "ok", locked: false, history: [] };
+      source.image = "ai";
+    } else {
+      // 3c. 离线兜底：legacy_builtin（不再自动用 builtin，仅在无网络且无 AI 时使用）
+      const builtin = findBuiltinImage(text);
+      if (builtin) {
+        item.image.localPath = builtinUrl(builtin.filename);
+        item.image.sourceType = "legacy_builtin";
+        item.image.status = "ok";
+        source.image = "legacy_builtin";
+      } else {
+        source.image = "none";
       }
     }
   } catch (e) {
     errors.push({ stage: "image", message: (e as Error).message });
+    // 图片生成失败不影响核心保存
   }
 
   return { item, errors, source };
@@ -244,7 +279,6 @@ export async function enrichItems(db: Db, items: EnrichRequestItem[], opts: Enri
   const pool = Array.from({ length: concurrency }, runWorker);
   await Promise.all(pool);
 
-  // results 已按输入顺序填满
   return results;
 }
 
@@ -257,26 +291,47 @@ export async function regenerateField(
   const cfg = await collectResolvedCfg(db);
   if (!cfg.text.enabled) throw new AiError("ai_not_configured", "AI 文本服务未配置");
 
-  const ai = await enrichWithAi(cfg.text, item.text, item.type);
-  const patch: Partial<ContentItem> = {};
-
   if (field === "image") {
-    const desc = item.image.description || item.aiMeta.imageDescription || ai.imageDescription;
-    if (!desc) throw new AiError("ai_empty", "缺少图片描述，无法生成图片");
+    // 优先使用已有 scene description；若无则从词条文本重新生成
+    const sceneDesc = item.aiMeta.imageDescription
+      || generateVisualScene(item.text, item.meaningZh, item.type).sceneDescription;
+    if (!sceneDesc) throw new AiError("ai_empty", "缺少图片场景描述，无法生成图片");
     if (!cfg.image.enabled) throw new AiError("ai_not_configured", "AI 图片服务未配置");
+    const prompt = buildImagePrompt({
+      word: item.text,
+      type: item.type,
+      meaningZh: item.meaningZh || undefined,
+      sceneDescription: sceneDesc
+    });
     const gen = await generateImage(new OpenAiCompatibleImage({
       baseUrl: cfg.image.baseUrl, apiKey: cfg.image.apiKey, model: cfg.image.model, provider: cfg.image.provider
-    }), desc);
-    patch.image = { ...gen, status: "ok", locked: item.image.locked, history: [] };
-    patch.aiMeta = { ...item.aiMeta, imageDescription: desc };
-    return patch;
+    }), prompt);
+    return {
+      image: { ...gen, status: "ok", locked: item.image.locked, history: [] }
+    };
   }
 
+  // 文本字段重新生成（保持原有逻辑）
+  const ai = await enrichWithAi(cfg.text, item.text, item.type);
+  const patch: Partial<ContentItem> = {};
   if (field === "meaningZh") patch.meaningZh = ai.meaningZh;
   else if (field === "definitionEn") patch.definitionEn = ai.definitionEn;
   else if (field === "example") patch.example = ai.example;
   else if (field === "memoryHint") patch.aiMeta = { ...item.aiMeta, memoryHint: ai.memoryHint };
   return patch;
+}
+
+/** 创建空的图片占位符（sourceType 默认 "api" 而非 "builtin"） */
+export function newImagePlaceholder(): ContentItem["image"] {
+  return {
+    localPath: "",
+    sourceType: "api",
+    sourceUrl: "",
+    description: "",
+    status: "ok",
+    locked: false,
+    history: []
+  };
 }
 
 export { httpGet };
